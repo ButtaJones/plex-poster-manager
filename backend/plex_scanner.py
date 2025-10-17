@@ -1,0 +1,390 @@
+"""
+Plex Scanner Module
+Scans Plex metadata bundles and extracts information about shows, seasons, and their artwork.
+"""
+
+import os
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+import json
+import hashlib
+
+
+class PlexScanner:
+    def __init__(self, metadata_path: str):
+        self.metadata_path = Path(metadata_path)
+        self.cache = {}
+        self.detailed_logging = True  # Will be toggled during scanning
+        print(f"[PlexScanner] Initialized with path: {self.metadata_path}")
+        print(f"[PlexScanner] Path exists: {self.metadata_path.exists()}")
+        print(f"[PlexScanner] Path is directory: {self.metadata_path.is_dir() if self.metadata_path.exists() else 'N/A'}")
+
+    def validate_path(self) -> bool:
+        """Validate that the provided path exists and looks like a Plex metadata directory."""
+        print(f"\n[validate_path] Checking path: {self.metadata_path}")
+
+        if not self.metadata_path.exists():
+            print(f"[validate_path] ERROR: Path does not exist!")
+            return False
+
+        if not self.metadata_path.is_dir():
+            print(f"[validate_path] ERROR: Path is not a directory!")
+            return False
+
+        # List contents of the directory
+        print(f"[validate_path] Directory contents:")
+        try:
+            for item in self.metadata_path.iterdir():
+                print(f"  - {item.name} ({'dir' if item.is_dir() else 'file'})")
+        except Exception as e:
+            print(f"[validate_path] ERROR listing directory: {e}")
+            return False
+
+        # Check for common Plex metadata folder structure
+        has_tv = (self.metadata_path / "TV Shows").exists()
+        has_movies = (self.metadata_path / "Movies").exists()
+
+        print(f"[validate_path] Has 'TV Shows' subdirectory: {has_tv}")
+        print(f"[validate_path] Has 'Movies' subdirectory: {has_movies}")
+
+        # Also check if this IS the TV Shows directory (user might have pointed directly to it)
+        is_tv_shows_dir = self.metadata_path.name == "TV Shows"
+        print(f"[validate_path] Is this the 'TV Shows' directory itself: {is_tv_shows_dir}")
+
+        return has_tv or has_movies or is_tv_shows_dir
+    
+    def get_libraries(self) -> List[str]:
+        """Get list of available libraries (TV Shows, Movies, etc.)."""
+        libraries = []
+        for item in self.metadata_path.iterdir():
+            if item.is_dir() and not item.name.startswith('.'):
+                libraries.append(item.name)
+        return libraries
+    
+    def find_bundles(self, library: str = "TV Shows") -> List[Path]:
+        """Find all .bundle directories in a library."""
+        print(f"\n[find_bundles] Looking for bundles in library: '{library}'")
+        library_path = self.metadata_path / library
+        print(f"[find_bundles] Library path: {library_path}")
+        print(f"[find_bundles] Library path exists: {library_path.exists()}")
+
+        if not library_path.exists():
+            print(f"[find_bundles] ERROR: Library path does not exist!")
+            # If the metadata_path itself might be the TV Shows directory, try scanning it directly
+            if self.metadata_path.name == library or self.metadata_path.name == library.replace(" ", ""):
+                print(f"[find_bundles] Metadata path itself appears to be the library directory, scanning it...")
+                library_path = self.metadata_path
+            else:
+                return []
+
+        bundles = []
+        print(f"[find_bundles] Scanning directory tree...")
+        try:
+            for root, dirs, files in os.walk(library_path):
+                for d in dirs:
+                    if d.endswith(".bundle"):
+                        bundle_path = Path(root) / d
+                        bundles.append(bundle_path)
+                        print(f"[find_bundles] Found bundle: {bundle_path.name}")
+        except Exception as e:
+            print(f"[find_bundles] ERROR during directory walk: {e}")
+
+        print(f"[find_bundles] Total bundles found: {len(bundles)}")
+        return bundles
+    
+    def parse_info_xml(self, bundle_path: Path) -> Optional[Dict]:
+        """Parse Info.xml from a bundle to extract metadata."""
+        # Try multiple possible locations for Info.xml (Plex uses different structures)
+        candidates = [
+            bundle_path / "Contents" / "Info.xml",
+            bundle_path / "Info.xml",
+            bundle_path / "Contents" / "_combined" / "Info.xml",
+            bundle_path / "Contents" / "com.plexapp.agents.thetvdb" / "Info.xml",
+            bundle_path / "Contents" / "com.plexapp.agents.themoviedb" / "Info.xml"
+        ]
+
+        if self.detailed_logging:
+            print(f"\n[parse_info_xml] Parsing bundle: {bundle_path.name}")
+
+        for info_path in candidates:
+            if self.detailed_logging:
+                print(f"[parse_info_xml]   Trying: {info_path}")
+            if info_path.exists():
+                if self.detailed_logging:
+                    print(f"[parse_info_xml]   ✓ FOUND at: {info_path}")
+                try:
+                    # Read and show first part of file for debugging (only if detailed logging)
+                    if self.detailed_logging:
+                        with open(info_path, 'r', encoding='utf-8') as f:
+                            first_chars = f.read(500)
+                            print(f"[parse_info_xml]   First 500 chars of XML:")
+                            print(f"   {first_chars[:500]}")
+
+                    # Parse the XML
+                    tree = ET.parse(info_path)
+                    root = tree.getroot()
+
+                    if self.detailed_logging:
+                        print(f"[parse_info_xml]   Root tag: {root.tag}")
+                        print(f"[parse_info_xml]   Root attribs: {root.attrib}")
+
+                    # Try different XML structures that Plex might use
+
+                    # Structure 1: MediaContainer > Directory
+                    directory = root.find(".//Directory")
+                    if directory is not None:
+                        if self.detailed_logging:
+                            print(f"[parse_info_xml]   Found <Directory> element")
+                        result = {
+                            "title": directory.attrib.get("title", "Unknown"),
+                            "type": directory.attrib.get("type", "unknown"),
+                            "key": directory.attrib.get("key", ""),
+                            "parent_title": directory.attrib.get("parentTitle", ""),
+                            "year": directory.attrib.get("year", ""),
+                            "guid": directory.attrib.get("guid", ""),
+                            "rating_key": directory.attrib.get("ratingKey", ""),
+                            "info_xml_path": str(info_path)
+                        }
+                        if self.detailed_logging:
+                            print(f"[parse_info_xml]   ✓ Successfully parsed: {result['title']}")
+                        return result
+
+                    # Structure 2: MediaContainer > Video
+                    video = root.find(".//Video")
+                    if video is not None:
+                        if self.detailed_logging:
+                            print(f"[parse_info_xml]   Found <Video> element")
+                        result = {
+                            "title": video.attrib.get("title", "Unknown"),
+                            "type": video.attrib.get("type", "unknown"),
+                            "key": video.attrib.get("key", ""),
+                            "parent_title": video.attrib.get("grandparentTitle", ""),
+                            "year": video.attrib.get("year", ""),
+                            "guid": video.attrib.get("guid", ""),
+                            "rating_key": video.attrib.get("ratingKey", ""),
+                            "info_xml_path": str(info_path)
+                        }
+                        if self.detailed_logging:
+                            print(f"[parse_info_xml]   ✓ Successfully parsed: {result['title']}")
+                        return result
+
+                    # Structure 3: Root IS MediaContainer with attributes
+                    if root.tag == "MediaContainer" and root.attrib:
+                        if self.detailed_logging:
+                            print(f"[parse_info_xml]   Root is MediaContainer with attributes")
+                        result = {
+                            "title": root.attrib.get("title", root.attrib.get("title1", "Unknown")),
+                            "type": root.attrib.get("type", "unknown"),
+                            "key": root.attrib.get("key", ""),
+                            "parent_title": root.attrib.get("parentTitle", ""),
+                            "year": root.attrib.get("year", ""),
+                            "guid": root.attrib.get("guid", ""),
+                            "rating_key": root.attrib.get("ratingKey", ""),
+                            "info_xml_path": str(info_path)
+                        }
+                        if self.detailed_logging:
+                            print(f"[parse_info_xml]   ✓ Successfully parsed: {result['title']}")
+                        return result
+
+                    # If we get here, we found XML but couldn't parse it
+                    if self.detailed_logging:
+                        print(f"[parse_info_xml]   ✗ Found XML but couldn't parse structure")
+                        print(f"[parse_info_xml]   Available elements:")
+                        for child in root:
+                            print(f"     - {child.tag}: {child.attrib}")
+
+                except ET.ParseError as e:
+                    if self.detailed_logging:
+                        print(f"[parse_info_xml]   ✗ XML Parse Error: {e}")
+                    continue
+                except Exception as e:
+                    if self.detailed_logging:
+                        print(f"[parse_info_xml]   ✗ Unexpected error: {e}")
+                    continue
+            else:
+                if self.detailed_logging:
+                    print(f"[parse_info_xml]   ✗ Not found")
+
+        if self.detailed_logging:
+            print(f"[parse_info_xml]   ✗ No valid Info.xml found in any location")
+        return None
+    
+    def get_artwork_files(self, bundle_path: Path) -> Dict[str, List[Dict]]:
+        """Get all artwork files from a bundle (posters, art, backgrounds, etc.)."""
+        artwork = {
+            "posters": [],
+            "art": [],
+            "backgrounds": [],
+            "banners": [],
+            "themes": []
+        }
+        
+        # Map folder names to artwork types
+        folder_mapping = {
+            "Posters": "posters",
+            "Art": "art",
+            "Backgrounds": "backgrounds",
+            "Banners": "banners",
+            "Themes": "themes"
+        }
+        
+        for folder_name, artwork_type in folder_mapping.items():
+            folder_path = bundle_path / folder_name
+            if folder_path.exists():
+                for file_path in folder_path.iterdir():
+                    if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
+                        # Extract source agent from filename
+                        filename = file_path.name
+                        source = self._extract_source_from_filename(filename)
+                        
+                        # Get file info
+                        file_stat = file_path.stat()
+                        
+                        artwork[artwork_type].append({
+                            "path": str(file_path),
+                            "filename": filename,
+                            "source": source,
+                            "size": file_stat.st_size,
+                            "modified": file_stat.st_mtime,
+                            "hash": self._get_file_hash(file_path)
+                        })
+        
+        return artwork
+    
+    def _extract_source_from_filename(self, filename: str) -> str:
+        """Extract the source agent from a filename."""
+        # Example: com.plexapp.agents.thetvdb_abc123.jpg -> thetvdb
+        if "com.plexapp.agents." in filename:
+            parts = filename.split("com.plexapp.agents.")[1]
+            source = parts.split("_")[0].split(".")[0]
+            return source
+        elif "local" in filename.lower():
+            return "local"
+        else:
+            return "unknown"
+    
+    def _get_file_hash(self, file_path: Path) -> str:
+        """Get MD5 hash of a file for duplicate detection."""
+        try:
+            hash_md5 = hashlib.md5()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
+        except Exception:
+            return ""
+    
+    def scan_library(self, library: str = "TV Shows", progress_callback=None) -> List[Dict]:
+        """Scan an entire library and return all items with their artwork."""
+        print(f"\n[scan_library] Starting scan of library: '{library}'")
+        bundles = self.find_bundles(library)
+        total = len(bundles)
+        print(f"[scan_library] Found {total} bundles to process")
+
+        # Enable detailed logging for first 3 bundles only
+        self.detailed_logging = True
+
+        results = []
+        bundles_without_info = 0
+        bundles_without_artwork = 0
+
+        for idx, bundle_path in enumerate(bundles):
+            if progress_callback:
+                progress_callback(idx + 1, total)
+
+            # Disable detailed logging after first 3 bundles
+            if idx >= 3:
+                self.detailed_logging = False
+
+            # Only print progress every 100 bundles after the first 3
+            if idx < 3 or idx % 100 == 0:
+                print(f"\n[scan_library] Processing bundle {idx+1}/{total}: {bundle_path.name}")
+
+            # Parse metadata
+            info = self.parse_info_xml(bundle_path)
+            if not info:
+                bundles_without_info += 1
+                if idx < 3:
+                    print(f"[scan_library] WARNING: No valid Info.xml found for {bundle_path.name}")
+                continue
+
+            if idx < 3:
+                print(f"[scan_library] Found info: {info.get('title', 'Unknown')}")
+
+            # Get artwork
+            artwork = self.get_artwork_files(bundle_path)
+
+            # Count total artwork items
+            total_artwork = sum(len(v) for v in artwork.values())
+            if idx < 3:
+                print(f"[scan_library] Found {total_artwork} artwork files")
+
+            if total_artwork > 0:  # Only include items with artwork
+                results.append({
+                    "bundle_path": str(bundle_path),
+                    "bundle_name": bundle_path.name,
+                    "info": info,
+                    "artwork": artwork,
+                    "total_artwork": total_artwork
+                })
+            else:
+                bundles_without_artwork += 1
+
+        print(f"\n[scan_library] Scan complete!")
+        print(f"[scan_library] Results summary:")
+        print(f"  - Total bundles scanned: {total}")
+        print(f"  - Bundles without Info.xml: {bundles_without_info}")
+        print(f"  - Bundles without artwork: {bundles_without_artwork}")
+        print(f"  - Bundles with artwork (returned): {len(results)}")
+
+        return results
+    
+    def find_duplicates(self, items: List[Dict]) -> List[Tuple[Dict, Dict]]:
+        """Find duplicate artwork across items based on file hash."""
+        hash_map = {}
+        duplicates = []
+        
+        for item in items:
+            for artwork_type, files in item["artwork"].items():
+                for file_info in files:
+                    file_hash = file_info["hash"]
+                    if file_hash and file_hash in hash_map:
+                        duplicates.append((hash_map[file_hash], file_info))
+                    else:
+                        hash_map[file_hash] = file_info
+        
+        return duplicates
+
+
+def detect_plex_path() -> Optional[str]:
+    """Auto-detect Plex metadata path based on OS."""
+    import platform
+    
+    system = platform.system()
+    
+    if system == "Windows":
+        # Windows default path
+        local_appdata = os.getenv("LOCALAPPDATA")
+        if local_appdata:
+            path = Path(local_appdata) / "Plex Media Server" / "Metadata"
+            if path.exists():
+                return str(path)
+    
+    elif system == "Darwin":  # macOS
+        home = Path.home()
+        path = home / "Library" / "Application Support" / "Plex Media Server" / "Metadata"
+        if path.exists():
+            return str(path)
+    
+    elif system == "Linux":
+        # Try common Linux paths
+        paths = [
+            Path("/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Metadata"),
+            Path.home() / ".config" / "Plex Media Server" / "Metadata"
+        ]
+        for path in paths:
+            if path.exists():
+                return str(path)
+    
+    return None

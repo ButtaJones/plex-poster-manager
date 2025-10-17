@@ -1,0 +1,109 @@
+import React from 'react';
+import ArtworkCard from './ArtworkCard';
+
+const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork }) => {
+  const [expanded, setExpanded] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('posters');
+
+  const { info, artwork, total_artwork } = item;
+
+  const tabs = [
+    { id: 'posters', label: 'Posters', count: artwork.posters?.length || 0 },
+    { id: 'art', label: 'Art', count: artwork.art?.length || 0 },
+    { id: 'backgrounds', label: 'Backgrounds', count: artwork.backgrounds?.length || 0 },
+    { id: 'banners', label: 'Banners', count: artwork.banners?.length || 0 },
+  ].filter((tab) => tab.count > 0);
+
+  const currentArtwork = artwork[activeTab] || [];
+
+  return (
+    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+      {/* Header */}
+      <div
+        className="p-4 bg-gray-50 border-b cursor-pointer hover:bg-gray-100 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-800">
+              {info.title}
+              {info.parent_title && (
+                <span className="text-sm text-gray-600 ml-2">
+                  ({info.parent_title})
+                </span>
+              )}
+            </h3>
+            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+              <span>Type: {info.type}</span>
+              {info.year && <span>Year: {info.year}</span>}
+              <span className="font-medium text-blue-600">
+                {total_artwork} artwork file{total_artwork !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+          <div className="ml-4">
+            <svg
+              className={`w-6 h-6 text-gray-600 transition-transform ${
+                expanded ? 'rotate-180' : ''
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {expanded && (
+        <div className="p-4">
+          {/* Tabs */}
+          <div className="flex gap-2 mb-4 border-b">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
+
+          {/* Artwork Grid */}
+          {currentArtwork.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {currentArtwork.map((art) => (
+                <ArtworkCard
+                  key={art.path}
+                  artwork={art}
+                  item={item}
+                  isSelected={selectedArtwork.includes(art.path)}
+                  onSelect={onSelectArtwork}
+                  onDelete={onDeleteArtwork}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">
+              No {activeTab} found for this item.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ItemCard;
