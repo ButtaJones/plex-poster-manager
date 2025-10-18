@@ -61,39 +61,80 @@ def get_config():
 def update_config():
     """Update configuration."""
     global config, scanner
-    data = request.json
-    
-    # Update config
-    config.update(data)
-    save_config()
-    
-    # Reinitialize scanner if path changed
-    if 'plex_metadata_path' in data and data['plex_metadata_path']:
-        scanner = PlexScanner(data['plex_metadata_path'])
-        if not scanner.validate_path():
+
+    print("\n[API /api/config POST] Updating configuration...")
+
+    try:
+        data = request.json
+        print(f"[API /api/config POST] Received data: {data}")
+
+        if not data:
+            print(f"[API /api/config POST] ERROR: No data received")
             return jsonify({
                 "success": False,
-                "error": "Invalid Plex metadata path"
+                "error": "No configuration data provided"
             }), 400
-    
-    return jsonify({"success": True, "config": config})
+
+        # Update config
+        config.update(data)
+        save_config()
+        print(f"[API /api/config POST] Configuration saved")
+
+        # Reinitialize scanner if path changed
+        if 'plex_metadata_path' in data and data['plex_metadata_path']:
+            print(f"[API /api/config POST] Initializing scanner with path: {data['plex_metadata_path']}")
+            scanner = PlexScanner(data['plex_metadata_path'])
+
+            if not scanner.validate_path():
+                print(f"[API /api/config POST] WARNING: Path validation failed")
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid Plex metadata path - path does not exist or is not a valid Plex directory"
+                }), 400
+
+            print(f"[API /api/config POST] Scanner initialized successfully")
+
+        print(f"[API /api/config POST] ✓ Configuration updated successfully")
+        return jsonify({"success": True, "config": config})
+
+    except Exception as e:
+        print(f"[API /api/config POST] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Failed to update configuration: {str(e)}"
+        }), 500
 
 
 @app.route('/api/detect-path', methods=['GET'])
 def auto_detect_path():
     """Auto-detect Plex metadata path."""
-    detected_path = detect_plex_path()
+    print("\n[API /api/detect-path] Auto-detecting Plex metadata path...")
 
-    if detected_path:
-        return jsonify({
-            "success": True,
-            "path": detected_path
-        })
-    else:
+    try:
+        detected_path = detect_plex_path()
+
+        if detected_path:
+            print(f"[API /api/detect-path] Found path: {detected_path}")
+            return jsonify({
+                "success": True,
+                "path": detected_path
+            })
+        else:
+            print(f"[API /api/detect-path] No path found")
+            return jsonify({
+                "success": False,
+                "error": "Could not auto-detect Plex path"
+            }), 404
+    except Exception as e:
+        print(f"[API /api/detect-path] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "success": False,
-            "error": "Could not auto-detect Plex path"
-        }), 404
+            "error": f"Error during path detection: {str(e)}"
+        }), 500
 
 
 @app.route('/api/test-token', methods=['POST'])

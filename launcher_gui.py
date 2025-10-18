@@ -130,10 +130,15 @@ class PlexPosterManagerLauncher:
         ttk.Button(path_frame, text="Auto-Detect", command=self.auto_detect_path).pack(side="left")
 
         # Plex Token (Optional)
-        ttk.Label(config_frame, text="Plex Token (Optional):").grid(row=2, column=0, sticky="w", pady=5)
+        token_label_frame = ttk.Frame(config_frame)
+        token_label_frame.grid(row=2, column=0, sticky="w", pady=5)
+
+        ttk.Label(token_label_frame, text="Plex Token (Optional):").pack(side="left")
+        ttk.Label(token_label_frame, text="ℹ️ Not required - app works without it",
+                  foreground="gray", font=("Helvetica", 9)).pack(side="left", padx=5)
 
         token_frame = ttk.Frame(config_frame)
-        token_frame.grid(row=3, column=0, sticky="ew", pady=(0, 10))
+        token_frame.grid(row=3, column=0, sticky="ew", pady=(0, 5))
 
         self.token_var = tk.StringVar(value=self.config.get("plex_token", ""))
         self.token_show_var = tk.BooleanVar(value=False)
@@ -146,9 +151,15 @@ class PlexPosterManagerLauncher:
                         command=self.toggle_token_visibility).pack(side="left", padx=2)
         ttk.Button(token_frame, text="Test Token", command=self.test_token).pack(side="left")
 
+        # Token help text
+        token_help = ttk.Label(config_frame,
+                              text="Token enables: API verification, automatic library detection. Not needed for basic file scanning.",
+                              foreground="gray", font=("Helvetica", 8), wraplength=600)
+        token_help.grid(row=4, column=0, sticky="w", pady=(0, 10))
+
         # Save Config Button
         ttk.Button(config_frame, text="💾 Save Configuration",
-                   command=self.save_configuration).grid(row=4, column=0, pady=5)
+                   command=self.save_configuration).grid(row=5, column=0, pady=5)
 
         # --- Control Section ---
         control_frame = ttk.Frame(main_frame)
@@ -270,26 +281,126 @@ class PlexPosterManagerLauncher:
             messagebox.showinfo("Success", "Configuration saved successfully!")
 
     def check_dependencies(self):
-        """Check if dependencies are installed."""
+        """Check if dependencies are installed, offer to install if missing."""
         self.log("Checking dependencies...")
+
+        needs_setup = []
 
         # Check Python venv
         if not VENV_PYTHON.exists():
             self.log("✗ Python virtual environment not found!")
-            self.log(f"  Expected: {VENV_PYTHON}")
-            self.log("  Run: cd backend && python -m venv venv")
-            self.status_label.config(text="● Missing Dependencies", foreground="red")
-            return False
+            needs_setup.append("Backend virtual environment")
 
         # Check node_modules
         if not (FRONTEND_DIR / "node_modules").exists():
             self.log("✗ Frontend dependencies not installed!")
-            self.log("  Run: cd frontend && npm install")
+            needs_setup.append("Frontend dependencies")
+
+        if needs_setup:
             self.status_label.config(text="● Missing Dependencies", foreground="red")
-            return False
+
+            # Offer automatic setup
+            msg = "First-time setup required:\n\n"
+            msg += "\n".join(f"  • {item}" for item in needs_setup)
+            msg += "\n\nThis will take 2-3 minutes."
+            msg += "\n\nWould you like to install dependencies automatically?"
+
+            if messagebox.askyesno("First Time Setup", msg):
+                return self.run_first_time_setup()
+            else:
+                self.log("\nManual setup required:")
+                if "Backend virtual environment" in needs_setup:
+                    self.log("  1. cd backend && python -m venv venv")
+                    self.log("  2. pip install -r backend/requirements.txt")
+                if "Frontend dependencies" in needs_setup:
+                    self.log("  3. cd frontend && npm install")
+                return False
 
         self.log("✓ All dependencies found")
         return True
+
+    def run_first_time_setup(self):
+        """Run automated first-time setup."""
+        self.log("\n" + "=" * 60)
+        self.log("FIRST TIME SETUP - This may take a few minutes")
+        self.log("=" * 60)
+
+        try:
+            # Create venv if needed
+            if not VENV_PYTHON.exists():
+                self.log("\n📦 Creating Python virtual environment...")
+                self.status_label.config(text="● Setting up backend...", foreground="orange")
+
+                result = subprocess.run(
+                    [sys.executable, "-m", "venv", "venv"],
+                    cwd=str(BACKEND_DIR),
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.returncode != 0:
+                    self.log(f"✗ Failed to create venv: {result.stderr}")
+                    messagebox.showerror("Setup Failed", f"Failed to create virtual environment:\n{result.stderr}")
+                    return False
+
+                self.log("✓ Virtual environment created")
+
+                # Install Python dependencies
+                self.log("\n📦 Installing backend dependencies...")
+
+                if platform.system() == "Windows":
+                    pip_exe = BACKEND_DIR / "venv" / "Scripts" / "pip.exe"
+                else:
+                    pip_exe = BACKEND_DIR / "venv" / "bin" / "pip"
+
+                result = subprocess.run(
+                    [str(pip_exe), "install", "-r", "requirements.txt"],
+                    cwd=str(BACKEND_DIR),
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.returncode != 0:
+                    self.log(f"✗ Failed to install backend dependencies: {result.stderr}")
+                    messagebox.showerror("Setup Failed", f"Failed to install backend dependencies:\n{result.stderr}")
+                    return False
+
+                self.log("✓ Backend dependencies installed")
+
+            # Install Node dependencies if needed
+            if not (FRONTEND_DIR / "node_modules").exists():
+                self.log("\n📦 Installing frontend dependencies (this takes longest)...")
+                self.status_label.config(text="● Setting up frontend...", foreground="orange")
+
+                result = subprocess.run(
+                    [NPM_CMD, "install"],
+                    cwd=str(FRONTEND_DIR),
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.returncode != 0:
+                    self.log(f"✗ Failed to install frontend dependencies: {result.stderr}")
+                    messagebox.showerror("Setup Failed", f"Failed to install frontend dependencies:\n{result.stderr}")
+                    return False
+
+                self.log("✓ Frontend dependencies installed")
+
+            self.log("\n" + "=" * 60)
+            self.log("✓ SETUP COMPLETE! You can now launch the servers.")
+            self.log("=" * 60 + "\n")
+
+            self.status_label.config(text="● Ready", foreground="green")
+            messagebox.showinfo("Setup Complete",
+                               "All dependencies installed successfully!\n\n"
+                               "You can now click 'Launch Servers' to start.")
+            return True
+
+        except Exception as e:
+            self.log(f"\n✗ Setup failed with error: {e}")
+            messagebox.showerror("Setup Failed", f"An error occurred during setup:\n{e}")
+            self.status_label.config(text="● Setup Failed", foreground="red")
+            return False
 
     def start_servers(self):
         """Start both backend and frontend servers."""

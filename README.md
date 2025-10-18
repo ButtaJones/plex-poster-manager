@@ -2,9 +2,48 @@
 
 A powerful web application for managing Plex Media Server artwork. Easily browse, organize, and delete posters, backgrounds, and other artwork files from your Plex metadata.
 
-![Plex Poster Manager](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Plex Poster Manager](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![React](https://img.shields.io/badge/react-18.2-blue.svg)
+
+---
+
+## 🚀 Quick Start (First-Time GitHub Users)
+
+**Just downloaded from GitHub? Follow these 3 simple steps:**
+
+### 1. Install Prerequisites
+- **Python 3.8+**: Download from [python.org](https://www.python.org/downloads/)
+- **Node.js 14+**: Download from [nodejs.org](https://nodejs.org/)
+
+### 2. Run the GUI Launcher
+```bash
+python launcher_gui.py
+```
+or
+```bash
+python3 launcher_gui.py
+```
+
+### 3. Automatic Setup
+The launcher will detect that this is your first run and prompt:
+- **"First-time setup required"** → Click **YES**
+- The app will automatically:
+  - ✅ Create Python virtual environment
+  - ✅ Install all backend dependencies
+  - ✅ Install all frontend dependencies
+  - ⏱️ Takes 2-3 minutes
+
+### 4. Launch and Configure
+After setup completes:
+1. Click **"▶ Launch Servers"**
+2. Configure your Plex metadata path (Browse or Auto-Detect)
+3. Click **"Save Configuration"**
+4. Start scanning your Plex artwork!
+
+**That's it!** Your app is ready to use. 🎉
+
+---
 
 ## Features
 
@@ -33,6 +72,12 @@ A powerful web application for managing Plex Media Server artwork. Easily browse
 - Per-library scanning
 
 ## Installation
+
+> **💡 NEW USERS:** See the [Quick Start](#-quick-start-first-time-github-users) section above for automatic setup!
+
+### Manual Installation (Advanced Users)
+
+If you prefer to set up manually instead of using the automatic launcher:
 
 ### Prerequisites
 - Python 3.8 or higher
