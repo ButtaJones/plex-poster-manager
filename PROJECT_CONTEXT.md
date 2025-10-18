@@ -1,8 +1,8 @@
 # Plex Poster Manager - Project Context
 
 **Last Updated:** 2025-10-18
-**Current Version:** 1.1.3
-**Status:** Backend Working, Info.xml Parsing Issue (BLOCKING)
+**Current Version:** 1.2.2
+**Status:** Backend Working, Hash Format Mismatch Investigation (BLOCKING)
 
 ---
 
@@ -30,52 +30,82 @@ Web application to manage Plex Media Server artwork files. Users can browse, vie
 
 ## 🚨 CURRENT BLOCKING ISSUE
 
-### Info.xml Parsing Returns 0 Results
+### Hash Format Mismatch - Bundle vs Database
 
-**Problem:**
-- Backend starts successfully ✅
-- Scan finds 2724 bundles ✅
-- HTTP 200 response ✅
-- **BUT:** 0 items returned to frontend ❌
-- All bundles being skipped (no valid Info.xml found)
+**CRITICAL DISCOVERY:**
+- Bundle folder names: **41 characters** (e.g., `0141c23da2b741b8e6e2c812b3f783965e36468`)
+- Database hash field: **40 characters** (e.g., `4c8efc880b76c2ed0d32774bf03455f7ff6baa3e`)
+- **THE FORMATS ARE DIFFERENT!** Bundle hash ≠ metadata_items.hash
 
-**Evidence:**
+**Root Cause:**
+The bundle folder name is NOT directly stored in `metadata_items.hash`.
+Plex likely uses a relational chain:
 ```
-[scan_library] Found 2724 bundles to process
-[scan_library] Results summary:
-  - Total bundles scanned: 2724
-  - Bundles without Info.xml: 2724  ← PROBLEM!
-  - Bundles with artwork (returned): 0
+metadata_items (id, title, hash)
+  -> media_items (metadata_item_id)
+    -> media_parts (media_item_id, file path containing bundle hash)
 ```
 
-**What We're Checking:**
-```python
-candidates = [
-    bundle_path / "Contents" / "Info.xml",
-    bundle_path / "Info.xml",
-    bundle_path / "Contents" / "_combined" / "Info.xml",
-    bundle_path / "Contents" / "com.plexapp.agents.thetvdb" / "Info.xml",
-    bundle_path / "Contents" / "com.plexapp.agents.themoviedb" / "Info.xml"
-]
-```
-
-**Current Debug Status:**
-- Enhanced logging added (v1.1.3)
-- Shows bundle contents for first 5 failed bundles
-- Will reveal actual directory structure
-- Need user to run scan and report console output
+**Current Investigation (v1.2.2):**
+Debug tooling added to inspect:
+1. `media_items` table schema
+2. `media_parts` table schema
+3. Sample `media_parts` rows (file paths)
+4. Search for bundle hash in `media_parts.file` column
+5. Fallback: Partial hash matching
 
 **Next Steps:**
-1. User runs scan on Windows
-2. Send console output showing bundle directory structure
-3. Identify where Info.xml actually lives
-4. Add correct paths to candidates list
+1. User pulls latest code (commit 7838e0a)
+2. Backend starts and auto-runs debug_database()
+3. User sends console output showing:
+   - Table schemas
+   - Sample file paths from media_parts
+   - Whether bundle hashes appear in file paths
+4. We identify correct table and column for mapping
+5. Implement proper bundle → metadata lookup
 
 ---
 
 ## 📚 Version History & Bug Fixes
 
-### Version 1.1.3 (Current) - ASCII Symbol Fix
+### Version 1.2.2 (Current) - Hash Investigation + Unicode Fix
+**Date:** 2025-10-18
+
+**Critical Discovery:**
+- Bundle folder names are 41 chars, database hashes are 40 chars
+- Bundle hash ≠ metadata_items.hash (different formats!)
+- Need to investigate media_parts table for file path mapping
+
+**Changes:**
+1. **Unicode Crash Fix (Again!)**
+   - Fixed remaining Unicode symbols in debug_database()
+   - → (arrow) → `->` (ASCII)
+   - ✓ and ✗ → `[OK]` and `[X]` (ASCII)
+
+2. **Comprehensive Table Investigation**
+   - Added media_items table inspection
+   - Added media_parts table inspection
+   - Sample file paths from media_parts (likely contain bundle hashes)
+   - Search for bundle hash in file paths
+   - Partial hash matching fallback
+
+**Why:** Need to understand how Plex maps bundle folders to metadata titles
+
+---
+
+### Version 1.2.1 - Initial Debug Tooling
+**Date:** 2025-10-18
+
+**Changes:**
+- Added debug_database() method to plex_scanner.py
+- Inspects metadata_items table schema
+- Shows sample TV show hashes
+- Compares bundle folder names with database hashes
+- Revealed the hash format mismatch!
+
+---
+
+### Version 1.1.3 - ASCII Symbol Fix
 **Date:** 2025-10-18
 
 **Changes:**
@@ -265,17 +295,24 @@ python -c "import app; print('Import successful!')"
 **If you're a new Claude session helping with this project:**
 
 1. **Read this file first** - It contains all critical context
-2. **Current blocking issue:** Info.xml parsing returns 0 results
+2. **Current blocking issue:** Hash format mismatch - bundle folders (41 chars) ≠ database hashes (40 chars)
 3. **Don't suggest UTF-8 TextIOWrapper** - Already tried, breaks Flask auto-reload
-4. **Use ASCII symbols** - [OK] and [X] instead of Unicode
+4. **ALWAYS use ASCII symbols** - [OK] and [X], not ✓ and ✗ (Windows cp1252 crashes!)
 5. **Plex token is optional** - Don't focus on token errors
 6. **User is on Windows** - Test/debug Windows-specific issues
 7. **Check git log** - See recent commits for latest changes
+8. **Modern Plex architecture:**
+   - Metadata in SQLite database: `com.plexapp.plugins.library.db`
+   - Artwork in filesystem bundles: `.bundle` folders
+   - Bundle hash mapping: Under investigation (v1.2.2)
 
 **Key Files:**
-- backend/plex_scanner.py - Info.xml parsing (issue here)
+- backend/plex_scanner.py - Database integration + bundle scanning (critical!)
 - backend/app.py - Flask API (working)
 - launcher_gui.py - GUI launcher (working)
+
+**Current Focus:**
+Waiting for user's debug output to reveal how media_parts table maps bundle folders to metadata_items.
 
 ---
 
