@@ -49,7 +49,7 @@ function App() {
       console.error('Error loading config:', error);
       setShowConfig(true);
     }
-  }, []); // Empty dependency array since it only uses state setters and loadLibraries
+  }, [loadLibraries]); // Include loadLibraries dependency
 
   // Load config on mount
   useEffect(() => {
