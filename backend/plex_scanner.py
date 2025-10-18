@@ -81,7 +81,7 @@ class PlexScanner:
             if results:
                 print("[DEBUG] Sample TV show hashes:")
                 for hash_val, title, year in results:
-                    print(f"  {hash_val} → {title} ({year})")
+                    print(f"  {hash_val} -> {title} ({year})")
             else:
                 print("[DEBUG] No TV shows found with metadata_type = 2")
 
@@ -109,9 +109,51 @@ class PlexScanner:
                 """, (bundle_hash,))
                 result = cursor.fetchone()
                 if result:
-                    print(f"    ✓ FOUND in DB: {result[0]}")
+                    print(f"    [OK] FOUND in DB: {result[0]}")
                 else:
-                    print(f"    ✗ NOT FOUND in database")
+                    print(f"    [X] NOT FOUND in database")
+
+            # CRITICAL: Investigate media_items and media_parts tables
+            # The bundle hash might be in file paths, not in metadata_items.hash!
+            print("\n[DEBUG] Investigating media_items table:")
+            cursor.execute("PRAGMA table_info(media_items)")
+            media_items_cols = cursor.fetchall()
+            print(f"  Columns: {[col[1] for col in media_items_cols]}")
+
+            print("\n[DEBUG] Investigating media_parts table:")
+            cursor.execute("PRAGMA table_info(media_parts)")
+            media_parts_cols = cursor.fetchall()
+            print(f"  Columns: {[col[1] for col in media_parts_cols]}")
+
+            # Sample media_parts data to see if file paths contain bundle hashes
+            print("\n[DEBUG] Sample media_parts rows (first 3):")
+            cursor.execute("SELECT * FROM media_parts LIMIT 3")
+            for row in cursor.fetchall():
+                print(f"  {row}")
+
+            # Try to find bundle hash in media_parts file paths
+            if bundles:
+                test_bundle = bundles[0].name.replace('.bundle', '')
+                print(f"\n[DEBUG] Searching for bundle hash in media_parts.file:")
+                print(f"  Looking for: {test_bundle[:20]}...")
+                cursor.execute("SELECT file FROM media_parts WHERE file LIKE ? LIMIT 3", (f"%{test_bundle}%",))
+                results = cursor.fetchall()
+                if results:
+                    print(f"  [OK] FOUND in media_parts!")
+                    for row in results:
+                        print(f"    File path: {row[0]}")
+                else:
+                    print(f"  [X] NOT FOUND in media_parts.file")
+
+                    # Try searching for just the first 10 chars of bundle hash
+                    short_hash = test_bundle[:10]
+                    print(f"\n[DEBUG] Searching for partial hash: {short_hash}...")
+                    cursor.execute("SELECT file FROM media_parts WHERE file LIKE ? LIMIT 3", (f"%{short_hash}%",))
+                    results = cursor.fetchall()
+                    if results:
+                        print(f"  [OK] FOUND partial match!")
+                        for row in results:
+                            print(f"    File path: {row[0]}")
 
             conn.close()
 
