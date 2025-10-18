@@ -87,12 +87,13 @@ class PlexScannerAPI:
             print(f"[get_libraries] ERROR: {e}")
             return []
 
-    def scan_library(self, library_name: str) -> List[Dict]:
+    def scan_library(self, library_name: str, progress_callback=None) -> List[Dict]:
         """
         Scan a library for shows/movies and their artwork.
 
         Args:
             library_name: Name of library to scan (e.g., 'TV Shows', 'Movies')
+            progress_callback: Optional callback function(current, total, item_name)
 
         Returns:
             List of items with artwork metadata
@@ -110,13 +111,18 @@ class PlexScannerAPI:
 
             items = []
             all_content = library.all()
-            print(f"[scan_library] Found {len(all_content)} items in library")
+            total_items = len(all_content)
+            print(f"[scan_library] Found {total_items} items in library")
 
             for idx, content in enumerate(all_content):
                 if idx < 5:  # Detailed logging for first 5 items
                     print(f"\n[scan_library] Processing item {idx + 1}: {content.title}")
                 elif idx == 5:
                     print(f"\n[scan_library] Processing remaining items (summary mode)...")
+
+                # Report progress
+                if progress_callback:
+                    progress_callback(idx + 1, total_items, content.title)
 
                 try:
                     item_data = self._get_item_artwork(content, detailed=idx < 5)
@@ -166,12 +172,14 @@ class PlexScannerAPI:
             if detailed:
                 print(f"  [artwork] Found {len(posters)} posters")
 
-            for poster in posters:
+            for idx, poster in enumerate(posters):
+                rating_key = poster.ratingKey if hasattr(poster, 'ratingKey') else f"poster_{idx}"
                 artwork_data["posters"].append({
+                    "path": f"{item.ratingKey}/poster/{rating_key}",  # Unique path for React keys
                     "provider": poster.provider if hasattr(poster, 'provider') else "unknown",
                     "selected": poster.selected if hasattr(poster, 'selected') else False,
                     "thumb_url": f"{self.plex_url}{poster.thumb}?X-Plex-Token={self.plex_token}",
-                    "rating_key": poster.ratingKey if hasattr(poster, 'ratingKey') else None,
+                    "rating_key": rating_key,
                     "type": "poster"
                 })
         except Exception as e:
@@ -184,12 +192,14 @@ class PlexScannerAPI:
             if detailed:
                 print(f"  [artwork] Found {len(arts)} background arts")
 
-            for art in arts:
+            for idx, art in enumerate(arts):
+                rating_key = art.ratingKey if hasattr(art, 'ratingKey') else f"art_{idx}"
                 artwork_data["art"].append({
+                    "path": f"{item.ratingKey}/art/{rating_key}",  # Unique path for React keys
                     "provider": art.provider if hasattr(art, 'provider') else "unknown",
                     "selected": art.selected if hasattr(art, 'selected') else False,
                     "thumb_url": f"{self.plex_url}{art.thumb}?X-Plex-Token={self.plex_token}",
-                    "rating_key": art.ratingKey if hasattr(art, 'ratingKey') else None,
+                    "rating_key": rating_key,
                     "type": "background"
                 })
         except Exception as e:
@@ -202,12 +212,14 @@ class PlexScannerAPI:
             if detailed:
                 print(f"  [artwork] Found {len(banners)} banners")
 
-            for banner in banners:
+            for idx, banner in enumerate(banners):
+                rating_key = banner.ratingKey if hasattr(banner, 'ratingKey') else f"banner_{idx}"
                 artwork_data["banners"].append({
+                    "path": f"{item.ratingKey}/banner/{rating_key}",  # Unique path for React keys
                     "provider": banner.provider if hasattr(banner, 'provider') else "unknown",
                     "selected": banner.selected if hasattr(banner, 'selected') else False,
                     "thumb_url": f"{self.plex_url}{banner.thumb}?X-Plex-Token={self.plex_token}",
-                    "rating_key": banner.ratingKey if hasattr(banner, 'ratingKey') else None,
+                    "rating_key": rating_key,
                     "type": "banner"
                 })
         except Exception as e:
@@ -220,12 +232,14 @@ class PlexScannerAPI:
             if detailed:
                 print(f"  [artwork] Found {len(themes)} themes")
 
-            for theme in themes:
+            for idx, theme in enumerate(themes):
+                rating_key = theme.ratingKey if hasattr(theme, 'ratingKey') else f"theme_{idx}"
                 artwork_data["themes"].append({
+                    "path": f"{item.ratingKey}/theme/{rating_key}",  # Unique path for React keys
                     "provider": theme.provider if hasattr(theme, 'provider') else "unknown",
                     "selected": theme.selected if hasattr(theme, 'selected') else False,
                     "thumb_url": f"{self.plex_url}{theme.thumb}?X-Plex-Token={self.plex_token}",
-                    "rating_key": theme.ratingKey if hasattr(theme, 'ratingKey') else None,
+                    "rating_key": rating_key,
                     "type": "theme"
                 })
         except Exception as e:
@@ -241,11 +255,14 @@ class PlexScannerAPI:
         )
 
         return {
-            "title": item.title,
-            "year": getattr(item, 'year', None),
-            "type": item.type,
-            "rating_key": item.ratingKey,
-            "guid": item.guid if hasattr(item, 'guid') else None,
+            "info": {
+                "title": item.title,
+                "year": getattr(item, 'year', None),
+                "type": item.type,
+                "rating_key": item.ratingKey,
+                "guid": item.guid if hasattr(item, 'guid') else None,
+                "parent_title": getattr(item, 'parentTitle', None) if item.type == 'season' else None
+            },
             "artwork": artwork_data,
             "total_artwork": total_artwork
         }

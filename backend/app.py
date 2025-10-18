@@ -23,6 +23,13 @@ CORS(app)
 scanner = None
 file_manager = FileManager()
 config = {}
+scan_progress = {
+    "scanning": False,
+    "current": 0,
+    "total": 0,
+    "current_item": "",
+    "library": ""
+}
 
 # Configuration file path
 CONFIG_FILE = Path(__file__).parent.parent / "config.json"
@@ -118,28 +125,28 @@ def update_config():
         }), 500
 
 
-@app.route('/api/detect-url', methods=['GET'])
-def auto_detect_url():
+@app.route('/api/detect-path', methods=['GET'])
+def auto_detect_path():
     """Auto-detect Plex server URL."""
-    print("\n[API /api/detect-url] Auto-detecting Plex server URL...")
+    print("\n[API /api/detect-path] Auto-detecting Plex server URL...")
 
     try:
         detected_url = detect_plex_url()
 
         if detected_url:
-            print(f"[API /api/detect-url] Found URL: {detected_url}")
+            print(f"[API /api/detect-path] Found URL: {detected_url}")
             return jsonify({
                 "success": True,
                 "url": detected_url
             })
         else:
-            print(f"[API /api/detect-url] No URL found")
+            print(f"[API /api/detect-path] No URL found")
             return jsonify({
                 "success": False,
                 "error": "Could not auto-detect Plex server"
             }), 404
     except Exception as e:
-        print(f"[API /api/detect-url] ERROR: {e}")
+        print(f"[API /api/detect-path] ERROR: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -247,6 +254,8 @@ def get_libraries():
 @app.route('/api/scan', methods=['POST'])
 def scan_library():
     """Scan a Plex library for items and artwork."""
+    global scan_progress
+
     if not scanner:
         return jsonify({
             "success": False,
@@ -258,8 +267,30 @@ def scan_library():
 
     print(f"\n[API /api/scan] Scanning library: {library}")
 
+    # Initialize progress
+    scan_progress = {
+        "scanning": True,
+        "current": 0,
+        "total": 0,
+        "current_item": "",
+        "library": library
+    }
+
+    def progress_callback(current, total, item_name):
+        """Update scan progress."""
+        scan_progress.update({
+            "scanning": True,
+            "current": current,
+            "total": total,
+            "current_item": item_name,
+            "library": library
+        })
+
     try:
-        items = scanner.scan_library(library)
+        items = scanner.scan_library(library, progress_callback=progress_callback)
+
+        # Mark scanning complete
+        scan_progress["scanning"] = False
 
         # Add statistics
         total_items = len(items)
@@ -292,6 +323,7 @@ def scan_library():
         return jsonify(response)
 
     except Exception as e:
+        scan_progress["scanning"] = False
         print(f"[API /api/scan] ERROR: {e}")
         import traceback
         traceback.print_exc()
@@ -437,6 +469,12 @@ def find_duplicates():
         "count": 0,
         "message": "Duplicate detection not yet implemented for API scanner"
     })
+
+
+@app.route('/api/scan-progress', methods=['GET'])
+def get_scan_progress():
+    """Get current scan progress."""
+    return jsonify(scan_progress)
 
 
 @app.route('/api/health', methods=['GET'])

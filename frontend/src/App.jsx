@@ -15,6 +15,7 @@ function App() {
   const [stats, setStats] = useState(null);
   const [operations, setOperations] = useState([]);
   const [showOperations, setShowOperations] = useState(false);
+  const [scanProgress, setScanProgress] = useState(null);
 
   const loadLibraries = async () => {
     try {
@@ -62,15 +63,35 @@ function App() {
 
   const handleScan = async () => {
     if (!selectedLibrary) return;
-    
+
     setLoading(true);
+    setScanProgress({ scanning: true, current: 0, total: 0, current_item: '' });
+
+    // Start polling for progress
+    const progressInterval = setInterval(async () => {
+      try {
+        const progressResponse = await libraryAPI.getScanProgress();
+        setScanProgress(progressResponse.data);
+
+        if (!progressResponse.data.scanning) {
+          clearInterval(progressInterval);
+        }
+      } catch (error) {
+        console.error('Error fetching progress:', error);
+      }
+    }, 500); // Poll every 500ms
+
     try {
       const response = await libraryAPI.scanLibrary(selectedLibrary);
       setItems(response.data.items);
       setStats(response.data.stats);
+      clearInterval(progressInterval);
+      setScanProgress(null);
     } catch (error) {
       console.error('Error scanning library:', error);
       alert('Error scanning library: ' + error.message);
+      clearInterval(progressInterval);
+      setScanProgress(null);
     } finally {
       setLoading(false);
     }
@@ -329,7 +350,23 @@ function App() {
         <div className="space-y-4">
           {loading ? (
             <div className="bg-white rounded-lg shadow-md p-12 text-center">
-              <div className="text-gray-500 text-lg">Scanning library...</div>
+              <div className="text-gray-500 text-lg mb-4">Scanning library...</div>
+              {scanProgress && scanProgress.total > 0 && (
+                <div className="max-w-md mx-auto">
+                  <div className="mb-2 text-sm text-gray-600">
+                    Processing {scanProgress.current} of {scanProgress.total} items
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+                    <div
+                      className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+                      style={{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {scanProgress.current_item}
+                  </div>
+                </div>
+              )}
             </div>
           ) : items.length > 0 ? (
             items.map((item, index) => (
