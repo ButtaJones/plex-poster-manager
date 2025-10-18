@@ -4,6 +4,17 @@ Professional approach using python-plexapi library.
 Based on how Kometa and Tautulli handle Plex artwork.
 """
 
+import sys
+import io
+
+# Fix Windows console encoding for Unicode characters (emojis in library names, etc.)
+if sys.platform == 'win32':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except Exception:
+        pass  # Fallback to default encoding if wrapper fails
+
 from plexapi.server import PlexServer
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from pathlib import Path

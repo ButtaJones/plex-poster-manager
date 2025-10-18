@@ -17,7 +17,7 @@ function App() {
   const [showOperations, setShowOperations] = useState(false);
   const [scanProgress, setScanProgress] = useState(null);
 
-  const loadLibraries = async () => {
+  const loadLibraries = useCallback(async () => {
     try {
       const response = await libraryAPI.getLibraries();
       const libs = response.data.libraries || [];
@@ -32,7 +32,7 @@ function App() {
     } catch (error) {
       console.error('Error loading libraries:', error);
     }
-  };
+  }, [selectedLibrary]);
 
   const loadConfig = useCallback(async () => {
     try {
