@@ -276,81 +276,68 @@ class PlexScanner:
             return ""
     
     def scan_library(self, library: str = "TV Shows", progress_callback=None) -> List[Dict]:
-        """Scan an entire library and return all items with their artwork."""
+        """Scan an entire library and return all items with their artwork.
+
+        NOTE: Modern Plex (newer versions) don't use Info.xml files anymore!
+        They use SQLite database instead. This scanner works without Info.xml
+        by using bundle hashes as identifiers.
+        """
         print(f"\n[scan_library] Starting scan of library: '{library}'")
+        print(f"[scan_library] NOTE: Skipping Info.xml parsing (modern Plex uses database)")
         bundles = self.find_bundles(library)
         total = len(bundles)
         print(f"[scan_library] Found {total} bundles to process")
 
-        # ALWAYS enable detailed logging for first 5 bundles to see what's wrong
-        self.detailed_logging = True
-
         results = []
-        bundles_without_info = 0
         bundles_without_artwork = 0
-        bundles_with_info_but_no_artwork = 0
 
         for idx, bundle_path in enumerate(bundles):
             if progress_callback:
                 progress_callback(idx + 1, total)
 
-            # Keep detailed logging for first 5 bundles instead of 3
-            if idx >= 5:
-                self.detailed_logging = False
-
-            # Always print progress for first 5, then every 100
-            if idx < 5 or idx % 100 == 0:
+            # Print progress every 100 bundles
+            if idx % 100 == 0 or idx < 5:
                 print(f"\n[scan_library] Processing bundle {idx+1}/{total}: {bundle_path.name}")
 
-            # Parse metadata
-            info = self.parse_info_xml(bundle_path)
-            if not info:
-                bundles_without_info += 1
-                if idx < 5:
-                    print(f"[scan_library] WARNING: No valid Info.xml found for {bundle_path.name}")
-                    # Show what's actually IN this bundle
-                    print(f"[scan_library] Bundle contents:")
-                    try:
-                        for item in bundle_path.iterdir():
-                            print(f"[scan_library]   - {item.name} ({'dir' if item.is_dir() else 'file'})")
-                            if item.is_dir() and item.name == "Contents":
-                                print(f"[scan_library]   Contents subdirectories:")
-                                for subitem in item.iterdir():
-                                    print(f"[scan_library]     - {subitem.name} ({'dir' if subitem.is_dir() else 'file'})")
-                    except Exception as e:
-                        print(f"[scan_library]   ERROR listing bundle: {e}")
-                continue
+            # Extract bundle hash (filename without .bundle extension)
+            bundle_hash = bundle_path.name.replace('.bundle', '')
 
-            if idx < 5:
-                print(f"[scan_library] Found info: {info.get('title', 'Unknown')}")
-
-            # Get artwork
+            # Get artwork directly - no Info.xml needed!
             artwork = self.get_artwork_files(bundle_path)
-
-            # Count total artwork items
             total_artwork = sum(len(v) for v in artwork.values())
+
             if idx < 5:
+                print(f"[scan_library] Bundle hash: {bundle_hash[:16]}...")
                 print(f"[scan_library] Found {total_artwork} artwork files")
 
-            if total_artwork > 0:  # Only include items with artwork
+            if total_artwork > 0:
+                # Use bundle hash as identifier (no Info.xml needed)
                 results.append({
                     "bundle_path": str(bundle_path),
                     "bundle_name": bundle_path.name,
-                    "info": info,
+                    "info": {
+                        "title": f"Bundle {bundle_hash[:12]}",  # Short hash as title
+                        "type": "bundle",
+                        "hash": bundle_hash,
+                        "rating_key": "",
+                        "guid": "",
+                        "year": "",
+                        "parent_title": ""
+                    },
                     "artwork": artwork,
                     "total_artwork": total_artwork
                 })
             else:
                 bundles_without_artwork += 1
-                bundles_with_info_but_no_artwork += 1
 
         print(f"\n[scan_library] Scan complete!")
         print(f"[scan_library] Results summary:")
         print(f"  - Total bundles scanned: {total}")
-        print(f"  - Bundles without Info.xml: {bundles_without_info}")
-        print(f"  - Bundles WITH Info.xml but NO artwork: {bundles_with_info_but_no_artwork}")
-        print(f"  - Bundles without artwork (total): {bundles_without_artwork}")
         print(f"  - Bundles with artwork (returned): {len(results)}")
+        print(f"  - Bundles without artwork (skipped): {bundles_without_artwork}")
+        print(f"[scan_library] NOTE: Modern Plex doesn't use Info.xml")
+        print(f"[scan_library] Using bundle hashes as identifiers")
+        print(f"[scan_library] Future update: Add Plex database lookup for real titles")
 
         return results
     
