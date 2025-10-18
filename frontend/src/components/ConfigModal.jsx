@@ -154,6 +154,33 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
             </p>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Thumbnail Size: {formData.thumbnail_size[0]}x{formData.thumbnail_size[1]}px
+            </label>
+            <input
+              type="range"
+              min="150"
+              max="600"
+              step="50"
+              value={formData.thumbnail_size[0]}
+              onChange={(e) => {
+                const width = parseInt(e.target.value);
+                const height = Math.round(width * 1.5); // 2:3 aspect ratio
+                setFormData({ ...formData, thumbnail_size: [width, height] });
+              }}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Small (150px)</span>
+              <span>Medium (300px)</span>
+              <span>Large (600px)</span>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              Adjust thumbnail display size (larger = better quality, slower loading)
+            </p>
+          </div>
+
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
