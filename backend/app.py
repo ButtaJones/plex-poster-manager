@@ -3,21 +3,12 @@ Flask API Server for Plex Poster Manager
 Provides REST endpoints for scanning, managing, and deleting Plex artwork.
 """
 
-import sys
-import io
-
-# Force UTF-8 encoding for Windows console to support Unicode symbols
-if sys.platform == 'win32':
-    try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-    except Exception:
-        pass  # If it fails, continue without UTF-8 (fallback)
-
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from pathlib import Path
 import os
+import sys
+import io
 import json
 from PIL import Image
 import requests
@@ -104,7 +95,7 @@ def update_config():
 
             print(f"[API /api/config POST] Scanner initialized successfully")
 
-        print(f"[API /api/config POST] ✓ Configuration updated successfully")
+        print(f"[API /api/config POST] [OK] Configuration updated successfully")
         return jsonify({"success": True, "config": config})
 
     except Exception as e:
@@ -192,7 +183,7 @@ def test_plex_token():
 
                 user_data = response.json()
                 username = user_data.get("username", user_data.get("title", "Unknown"))
-                print(f"[test-token] ✓ Token valid for user: {username}")
+                print(f"[test-token] [OK] Token valid for user: {username}")
 
                 return jsonify({
                     "success": True,

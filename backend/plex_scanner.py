@@ -9,16 +9,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import json
 import hashlib
-import sys
-import io
-
-# Force UTF-8 encoding for Windows console to support Unicode symbols
-if sys.platform == 'win32':
-    try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-    except Exception:
-        pass  # If it fails, continue without UTF-8 (fallback)
 
 
 class PlexScanner:
@@ -122,7 +112,7 @@ class PlexScanner:
                 print(f"[parse_info_xml]   Trying: {info_path}")
             if info_path.exists():
                 if self.detailed_logging:
-                    print(f"[parse_info_xml]   ✓ FOUND at: {info_path}")
+                    print(f"[parse_info_xml]   [OK] FOUND at: {info_path}")
                 try:
                     # Read and show first part of file for debugging (only if detailed logging)
                     if self.detailed_logging:
@@ -157,7 +147,7 @@ class PlexScanner:
                             "info_xml_path": str(info_path)
                         }
                         if self.detailed_logging:
-                            print(f"[parse_info_xml]   ✓ Successfully parsed: {result['title']}")
+                            print(f"[parse_info_xml]   [OK] Successfully parsed: {result['title']}")
                         return result
 
                     # Structure 2: MediaContainer > Video
@@ -176,7 +166,7 @@ class PlexScanner:
                             "info_xml_path": str(info_path)
                         }
                         if self.detailed_logging:
-                            print(f"[parse_info_xml]   ✓ Successfully parsed: {result['title']}")
+                            print(f"[parse_info_xml]   [OK] Successfully parsed: {result['title']}")
                         return result
 
                     # Structure 3: Root IS MediaContainer with attributes
@@ -194,30 +184,30 @@ class PlexScanner:
                             "info_xml_path": str(info_path)
                         }
                         if self.detailed_logging:
-                            print(f"[parse_info_xml]   ✓ Successfully parsed: {result['title']}")
+                            print(f"[parse_info_xml]   [OK] Successfully parsed: {result['title']}")
                         return result
 
                     # If we get here, we found XML but couldn't parse it
                     if self.detailed_logging:
-                        print(f"[parse_info_xml]   ✗ Found XML but couldn't parse structure")
+                        print(f"[parse_info_xml]   [X] Found XML but couldn't parse structure")
                         print(f"[parse_info_xml]   Available elements:")
                         for child in root:
                             print(f"     - {child.tag}: {child.attrib}")
 
                 except ET.ParseError as e:
                     if self.detailed_logging:
-                        print(f"[parse_info_xml]   ✗ XML Parse Error: {e}")
+                        print(f"[parse_info_xml]   [X] XML Parse Error: {e}")
                     continue
                 except Exception as e:
                     if self.detailed_logging:
-                        print(f"[parse_info_xml]   ✗ Unexpected error: {e}")
+                        print(f"[parse_info_xml]   [X] Unexpected error: {e}")
                     continue
             else:
                 if self.detailed_logging:
-                    print(f"[parse_info_xml]   ✗ Not found")
+                    print(f"[parse_info_xml]   [X] Not found")
 
         if self.detailed_logging:
-            print(f"[parse_info_xml]   ✗ No valid Info.xml found in any location")
+            print(f"[parse_info_xml]   [X] No valid Info.xml found in any location")
         return None
     
     def get_artwork_files(self, bundle_path: Path) -> Dict[str, List[Dict]]:
