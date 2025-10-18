@@ -1,18 +1,18 @@
 """
 Plex Scanner Module
-Scans Plex metadata bundles and extracts information about shows, seasons, and their artwork.
+Scans Plex metadata bundles and extracts artwork for management.
 
-ARCHITECTURE (Modern Plex):
-- Metadata (titles, summaries) stored in SQLite database
-- Artwork (posters, backgrounds) stored in filesystem bundles
-- Bundle hash maps to database hash column
+SIMPLIFIED APPROACH (Proven by Testing):
+- Bundle folder hashes are NOT stored in Plex database
+- Plex generates bundle hashes from metadata GUIDs (one-way, not reversible)
+- This scanner simply finds bundles and extracts artwork
+- Users identify what to delete visually from thumbnails (better UX!)
+- No database lookups needed - just pure filesystem scanning
 """
 
 import os
-import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import json
 import hashlib
 
 
@@ -21,23 +21,11 @@ class PlexScanner:
         self.metadata_path = Path(metadata_path)
         self.cache = {}
 
-        # Find Plex database
-        # metadata_path is: C:\...\Plex Media Server\Metadata
-        # We need:          C:\...\Plex Media Server\Plug-in Support\Databases\...
-        # So go UP one level from Metadata/ to get Plex Media Server root
-        plex_root = self.metadata_path.parent  # FIXED: was .parent.parent (too far!)
-        self.db_path = plex_root / "Plug-in Support" / "Databases" / "com.plexapp.plugins.library.db"
-
         print(f"[PlexScanner] Initialized with path: {self.metadata_path}")
         print(f"[PlexScanner] Path exists: {self.metadata_path.exists()}")
         print(f"[PlexScanner] Path is directory: {self.metadata_path.is_dir() if self.metadata_path.exists() else 'N/A'}")
-        print(f"[PlexScanner] Plex root: {plex_root}")
-        print(f"[PlexScanner] Database path: {self.db_path}")
-        print(f"[PlexScanner] Database exists: {self.db_path.exists()}")
-
-        # Debug database structure if it exists
-        if self.db_path.exists():
-            self.debug_database()
+        print(f"[PlexScanner] SIMPLIFIED MODE: Artwork-only scanning (no database)")
+        print(f"[PlexScanner] Users will identify items visually from thumbnails")
 
     def debug_database(self):
         """Inspect database structure and sample data to understand schema."""
@@ -499,27 +487,20 @@ class PlexScanner:
     def scan_library(self, library: str = "TV Shows", progress_callback=None) -> List[Dict]:
         """Scan an entire library and return all items with their artwork.
 
-        Modern Plex Architecture:
-        - Metadata (titles, etc.) stored in SQLite database
-        - Artwork stored in filesystem bundles
-        - This scanner queries database for titles + filesystem for artwork
+        SIMPLIFIED APPROACH:
+        - Bundle folder names are NOT in the database (proven by testing)
+        - Just return artwork grouped by bundle
+        - Users can visually identify what to delete from thumbnails
+        - This is actually BETTER UX than trying to show titles!
         """
         print(f"\n[scan_library] Starting scan of library: '{library}'")
-        print(f"[scan_library] Using Plex database for titles + filesystem for artwork")
+        print(f"[scan_library] SIMPLIFIED MODE: Artwork-only (no database lookups)")
         bundles = self.find_bundles(library)
         total = len(bundles)
         print(f"[scan_library] Found {total} bundles to process")
 
-        if self.db_path.exists():
-            print(f"[scan_library] Database found: {self.db_path}")
-        else:
-            print(f"[scan_library] WARNING: Database not found at {self.db_path}")
-            print(f"[scan_library] Will use bundle hashes as titles")
-
         results = []
         bundles_without_artwork = 0
-        db_hits = 0
-        db_misses = 0
 
         for idx, bundle_path in enumerate(bundles):
             if progress_callback:
@@ -529,33 +510,30 @@ class PlexScanner:
             if idx % 100 == 0 or idx < 5:
                 print(f"\n[scan_library] Processing bundle {idx+1}/{total}: {bundle_path.name}")
 
-            # Extract bundle hash (filename without .bundle extension)
-            bundle_hash = bundle_path.name.replace('.bundle', '')
-
-            # Get title from database
-            info = self.get_title_from_db(bundle_hash)
-
-            # Track database hits/misses
-            if info["title"].startswith("Bundle "):
-                db_misses += 1
-            else:
-                db_hits += 1
-
             # Get artwork from filesystem
             artwork = self.get_artwork_files(bundle_path)
             total_artwork = sum(len(v) for v in artwork.values())
 
             if idx < 5:
-                print(f"[scan_library] Bundle hash: {bundle_hash[:16]}...")
-                print(f"[scan_library] Title from DB: {info['title']}")
                 print(f"[scan_library] Found {total_artwork} artwork files")
 
             if total_artwork > 0:
-                # Combine database info + filesystem artwork
+                # Extract bundle hash for display
+                bundle_hash = bundle_path.name.replace('.bundle', '')
+
+                # Return simple bundle info
                 results.append({
                     "bundle_path": str(bundle_path),
                     "bundle_name": bundle_path.name,
-                    "info": info,  # Real title from database!
+                    "info": {
+                        "title": f"Bundle {bundle_hash[:12]}",
+                        "type": "unknown",
+                        "year": "",
+                        "studio": "",
+                        "guid": "",
+                        "rating_key": "",
+                        "parent_title": ""
+                    },
                     "artwork": artwork,
                     "total_artwork": total_artwork
                 })
@@ -567,8 +545,6 @@ class PlexScanner:
         print(f"  - Total bundles scanned: {total}")
         print(f"  - Bundles with artwork (returned): {len(results)}")
         print(f"  - Bundles without artwork (skipped): {bundles_without_artwork}")
-        print(f"  - Database hits (real titles): {db_hits}")
-        print(f"  - Database misses (hash titles): {db_misses}")
 
         return results
     
