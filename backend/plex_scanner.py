@@ -388,7 +388,15 @@ class PlexScanner:
         return None
     
     def get_artwork_files(self, bundle_path: Path) -> Dict[str, List[Dict]]:
-        """Get all artwork files from a bundle (posters, art, backgrounds, etc.)."""
+        """Get all artwork files from a bundle (modern Plex structure 2024/2025).
+
+        Modern Plex stores artwork in:
+        - Contents/_combined/<type>/ (selected artwork - symlinks/copies)
+        - Contents/<agent>/<type>/ (agent-specific caches, e.g., com.plexapp.agents.thetvdb)
+        - Uploads/<type>/ (user-uploaded custom artwork)
+
+        OLD structure (bundle/Posters/) is no longer used in modern Plex!
+        """
         artwork = {
             "posters": [],
             "art": [],
@@ -396,37 +404,71 @@ class PlexScanner:
             "banners": [],
             "themes": []
         }
-        
-        # Map folder names to artwork types
+
+        # Modern Plex locations to check
+        search_bases = [
+            bundle_path / "Contents" / "_combined",  # Selected artwork (priority)
+            bundle_path / "Uploads"  # User uploads
+        ]
+
+        # Also scan agent-specific folders (com.plexapp.agents.*)
+        contents_path = bundle_path / "Contents"
+        if contents_path.exists():
+            try:
+                for agent_dir in contents_path.iterdir():
+                    if agent_dir.is_dir() and agent_dir.name.startswith("com.plexapp.agents."):
+                        search_bases.append(agent_dir)
+            except Exception:
+                pass  # Skip if can't read Contents/
+
+        # Map folder names to artwork types (lowercase for modern Plex)
         folder_mapping = {
-            "Posters": "posters",
-            "Art": "art",
-            "Backgrounds": "backgrounds",
-            "Banners": "banners",
-            "Themes": "themes"
+            "posters": "posters",
+            "art": "art",
+            "backgrounds": "backgrounds",
+            "banners": "banners",
+            "themes": "themes"
         }
-        
-        for folder_name, artwork_type in folder_mapping.items():
-            folder_path = bundle_path / folder_name
-            if folder_path.exists():
-                for file_path in folder_path.iterdir():
-                    if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
-                        # Extract source agent from filename
-                        filename = file_path.name
-                        source = self._extract_source_from_filename(filename)
-                        
-                        # Get file info
-                        file_stat = file_path.stat()
-                        
-                        artwork[artwork_type].append({
-                            "path": str(file_path),
-                            "filename": filename,
-                            "source": source,
-                            "size": file_stat.st_size,
-                            "modified": file_stat.st_mtime,
-                            "hash": self._get_file_hash(file_path)
-                        })
-        
+
+        # Scan all locations
+        for base_path in search_bases:
+            if not base_path.exists():
+                continue
+
+            for folder_name, artwork_type in folder_mapping.items():
+                folder_path = base_path / folder_name
+                if folder_path.exists() and folder_path.is_dir():
+                    try:
+                        for file_path in folder_path.iterdir():
+                            if file_path.is_file() and file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif']:
+                                # Determine source from path
+                                if "_combined" in str(base_path):
+                                    source = "selected"
+                                elif "Uploads" in str(base_path):
+                                    source = "uploaded"
+                                elif "com.plexapp.agents." in str(base_path):
+                                    # Extract agent name (e.g., thetvdb, themoviedb)
+                                    agent = base_path.name.replace("com.plexapp.agents.", "")
+                                    source = agent
+                                else:
+                                    source = "unknown"
+
+                                # Get file info
+                                file_stat = file_path.stat()
+
+                                artwork[artwork_type].append({
+                                    "path": str(file_path),
+                                    "filename": file_path.name,
+                                    "source": source,
+                                    "location": base_path.name,  # _combined, Uploads, or agent name
+                                    "size": file_stat.st_size,
+                                    "modified": file_stat.st_mtime,
+                                    "hash": self._get_file_hash(file_path)
+                                })
+                    except Exception:
+                        # Skip folders we can't read
+                        continue
+
         return artwork
     
     def _extract_source_from_filename(self, filename: str) -> str:
