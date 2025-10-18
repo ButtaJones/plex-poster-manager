@@ -2,27 +2,57 @@ import React, { useState } from 'react';
 
 const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
   const [formData, setFormData] = useState({
-    plex_metadata_path: config?.plex_metadata_path || '',
+    plex_url: config?.plex_url || 'http://localhost:32400',
+    plex_token: config?.plex_token || '',
     backup_directory: config?.backup_directory || '',
     thumbnail_size: config?.thumbnail_size || [300, 450],
   });
 
   const [detecting, setDetecting] = useState(false);
+  const [testing, setTesting] = useState(false);
 
-  const handleDetectPath = async () => {
+  const handleDetectUrl = async () => {
     setDetecting(true);
     try {
       const { configAPI } = await import('../api');
       const response = await configAPI.detectPath();
       if (response.data.success) {
-        setFormData({ ...formData, plex_metadata_path: response.data.path });
+        setFormData({ ...formData, plex_url: response.data.url });
+        alert(`Found Plex server at: ${response.data.url}`);
       } else {
-        alert('Could not auto-detect Plex path. Please enter it manually.');
+        alert('Could not auto-detect Plex server. Please enter URL manually.');
       }
     } catch (error) {
-      alert('Error detecting Plex path: ' + error.message);
+      alert('Error detecting Plex server: ' + error.message);
     } finally {
       setDetecting(false);
+    }
+  };
+
+  const handleTestToken = async () => {
+    if (!formData.plex_token) {
+      alert('Please enter a Plex token first');
+      return;
+    }
+
+    setTesting(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/test-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: formData.plex_token })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`✓ Token valid! Connected to: ${data.username}`);
+      } else {
+        alert(`✗ Token validation failed: ${data.error}`);
+      }
+    } catch (error) {
+      alert('Error testing token: ' + error.message);
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -41,24 +71,30 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+            <p className="text-sm text-blue-800">
+              <strong>API Mode:</strong> This app uses the Plex API to manage artwork. You need a Plex server URL and authentication token.
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Plex Metadata Path
+              Plex Server URL
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
-                value={formData.plex_metadata_path}
+                value={formData.plex_url}
                 onChange={(e) =>
-                  setFormData({ ...formData, plex_metadata_path: e.target.value })
+                  setFormData({ ...formData, plex_url: e.target.value })
                 }
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="/path/to/Plex Media Server/Metadata"
+                placeholder="http://localhost:32400"
                 required
               />
               <button
                 type="button"
-                onClick={handleDetectPath}
+                onClick={handleDetectUrl}
                 disabled={detecting}
                 className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
               >
@@ -66,13 +102,43 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
               </button>
             </div>
             <p className="mt-1 text-sm text-gray-500">
-              Path to your Plex Media Server's Metadata folder
+              Usually http://localhost:32400 for local servers
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Backup Directory
+              Plex Token (Required)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.plex_token}
+                onChange={(e) =>
+                  setFormData({ ...formData, plex_token: e.target.value })
+                }
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                placeholder="Your Plex authentication token"
+                required
+              />
+              <button
+                type="button"
+                onClick={handleTestToken}
+                disabled={testing || !formData.plex_token}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+              >
+                {testing ? 'Testing...' : 'Test'}
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              Get your token from Plex Settings → Network → Show Advanced → Manual Connections
+              {' '}(<a href="https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">How to find</a>)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Backup Directory (Optional)
             </label>
             <input
               type="text"
@@ -84,35 +150,8 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
               placeholder="/path/to/backups"
             />
             <p className="mt-1 text-sm text-gray-500">
-              Where deleted artwork will be backed up (optional)
+              Where deleted artwork will be backed up
             </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Common Plex Paths
-            </label>
-            <div className="space-y-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
-              <div>
-                <strong>Windows:</strong>{' '}
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded">
-                  %LOCALAPPDATA%\Plex Media Server\Metadata
-                </code>
-              </div>
-              <div>
-                <strong>macOS:</strong>{' '}
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded">
-                  ~/Library/Application Support/Plex Media Server/Metadata
-                </code>
-              </div>
-              <div>
-                <strong>Linux:</strong>{' '}
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded">
-                  /var/lib/plexmediaserver/Library/Application Support/Plex Media
-                  Server/Metadata
-                </code>
-              </div>
-            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

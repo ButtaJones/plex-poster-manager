@@ -148,6 +148,25 @@ class PlexScannerAPI:
             traceback.print_exc()
             return []
 
+    def _build_thumb_url(self, thumb_path: str) -> str:
+        """
+        Build complete thumbnail URL, handling both relative and absolute URLs.
+
+        Args:
+            thumb_path: Thumb path from PlexAPI (can be relative or absolute URL)
+
+        Returns:
+            Complete thumbnail URL with token
+        """
+        # If it's already a full URL (starts with http:// or https://), use as-is
+        if thumb_path.startswith('http://') or thumb_path.startswith('https://'):
+            # Add token as query parameter
+            separator = '&' if '?' in thumb_path else '?'
+            return f"{thumb_path}{separator}X-Plex-Token={self.plex_token}"
+        else:
+            # It's a relative path, prepend server URL
+            return f"{self.plex_url}{thumb_path}?X-Plex-Token={self.plex_token}"
+
     def _get_item_artwork(self, item, detailed: bool = False) -> Dict:
         """
         Get all artwork for a single item (show/movie).
@@ -178,7 +197,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/poster/{rating_key}",  # Unique path for React keys
                     "provider": poster.provider if hasattr(poster, 'provider') else "unknown",
                     "selected": poster.selected if hasattr(poster, 'selected') else False,
-                    "thumb_url": f"{self.plex_url}{poster.thumb}?X-Plex-Token={self.plex_token}",
+                    "thumb_url": self._build_thumb_url(poster.thumb),
                     "rating_key": rating_key,
                     "type": "poster"
                 })
@@ -198,7 +217,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/art/{rating_key}",  # Unique path for React keys
                     "provider": art.provider if hasattr(art, 'provider') else "unknown",
                     "selected": art.selected if hasattr(art, 'selected') else False,
-                    "thumb_url": f"{self.plex_url}{art.thumb}?X-Plex-Token={self.plex_token}",
+                    "thumb_url": self._build_thumb_url(art.thumb),
                     "rating_key": rating_key,
                     "type": "background"
                 })
@@ -218,7 +237,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/banner/{rating_key}",  # Unique path for React keys
                     "provider": banner.provider if hasattr(banner, 'provider') else "unknown",
                     "selected": banner.selected if hasattr(banner, 'selected') else False,
-                    "thumb_url": f"{self.plex_url}{banner.thumb}?X-Plex-Token={self.plex_token}",
+                    "thumb_url": self._build_thumb_url(banner.thumb),
                     "rating_key": rating_key,
                     "type": "banner"
                 })
@@ -238,7 +257,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/theme/{rating_key}",  # Unique path for React keys
                     "provider": theme.provider if hasattr(theme, 'provider') else "unknown",
                     "selected": theme.selected if hasattr(theme, 'selected') else False,
-                    "thumb_url": f"{self.plex_url}{theme.thumb}?X-Plex-Token={self.plex_token}",
+                    "thumb_url": self._build_thumb_url(theme.thumb),
                     "rating_key": rating_key,
                     "type": "theme"
                 })

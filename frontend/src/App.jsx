@@ -31,8 +31,8 @@ function App() {
       const response = await configAPI.getConfig();
       setConfig(response.data);
 
-      // If no path configured, show config modal
-      if (!response.data.plex_metadata_path) {
+      // If no Plex URL configured, show config modal (API mode uses plex_url, not plex_metadata_path)
+      if (!response.data.plex_url) {
         setShowConfig(true);
       } else {
         loadLibraries();
@@ -381,11 +381,11 @@ function App() {
           ) : (
             <div className="bg-white rounded-lg shadow-md p-12 text-center">
               <div className="text-gray-500 text-lg mb-4">
-                {config?.plex_metadata_path
+                {config?.plex_url
                   ? 'Click "Scan Library" to get started'
-                  : 'Please configure your Plex path in Settings'}
+                  : 'Please configure your Plex settings'}
               </div>
-              {!config?.plex_metadata_path && (
+              {!config?.plex_url && (
                 <button
                   onClick={() => setShowConfig(true)}
                   className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
