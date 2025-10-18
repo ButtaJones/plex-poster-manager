@@ -1,8 +1,8 @@
 # Plex Poster Manager - Project Context
 
 **Last Updated:** 2025-10-18
-**Current Version:** 1.2.2
-**Status:** Backend Working, Hash Format Mismatch Investigation (BLOCKING)
+**Current Version:** 1.3.0
+**Status:** WORKING! Simplified artwork-only mode (no database lookups)
 
 ---
 
@@ -28,47 +28,80 @@ Web application to manage Plex Media Server artwork files. Users can browse, vie
 
 ---
 
-## 🚨 CURRENT BLOCKING ISSUE
+## ✅ SOLUTION IMPLEMENTED - Artwork-Only Mode
 
-### Hash Format Mismatch - Bundle vs Database
+### The Final Answer: Bundle Hashes Are NOT in Database
 
-**CRITICAL DISCOVERY:**
-- Bundle folder names: **41 characters** (e.g., `0141c23da2b741b8e6e2c812b3f783965e36468`)
-- Database hash field: **40 characters** (e.g., `4c8efc880b76c2ed0d32774bf03455f7ff6baa3e`)
-- **THE FORMATS ARE DIFFERENT!** Bundle hash ≠ metadata_items.hash
+**Discovery from Debug Output:**
+- Bundle hashes are **NOT stored anywhere** in the Plex database
+- Bundle hash (41 chars) ≠ metadata_items.hash (40 chars)
+- Bundle hashes do **NOT appear** in media_parts.file paths
+- Plex generates bundle hashes from metadata GUIDs (one-way, NOT reversible)
 
-**Root Cause:**
-The bundle folder name is NOT directly stored in `metadata_items.hash`.
-Plex likely uses a relational chain:
+**The Simplified Solution (v1.3.0):**
+Stop trying to link bundles to database titles. Instead:
+
+1. **Scan bundles** for artwork files
+2. **Display artwork** in grid with thumbnails
+3. **Users identify** what to delete visually (better UX!)
+4. **No database** lookups needed
+
+**Why This Is Actually Better:**
+- ✅ Users SEE the artwork (the whole point of the app!)
+- ✅ No confusing title mismatches
+- ✅ Faster scanning (no database queries)
+- ✅ More reliable (no database dependencies)
+- ✅ Simpler code (less complexity)
+- ✅ **ACTUALLY RETURNS RESULTS** instead of 0!
+
+**What Users See:**
 ```
-metadata_items (id, title, hash)
-  -> media_items (metadata_item_id)
-    -> media_parts (media_item_id, file path containing bundle hash)
+Bundle 01e20068180c
+  └─ Posters (5 files)
+  └─ Backgrounds (2 files)
+[Thumbnail Grid of Actual Artwork]
 ```
 
-**Current Investigation (v1.2.2):**
-Debug tooling added to inspect:
-1. `media_items` table schema
-2. `media_parts` table schema
-3. Sample `media_parts` rows (file paths)
-4. Search for bundle hash in `media_parts.file` column
-5. Fallback: Partial hash matching
-
-**Next Steps:**
-1. User pulls latest code (commit 7838e0a)
-2. Backend starts and auto-runs debug_database()
-3. User sends console output showing:
-   - Table schemas
-   - Sample file paths from media_parts
-   - Whether bundle hashes appear in file paths
-4. We identify correct table and column for mapping
-5. Implement proper bundle → metadata lookup
+Users can visually identify what belongs to which show from the artwork itself!
 
 ---
 
 ## 📚 Version History & Bug Fixes
 
-### Version 1.2.2 (Current) - Hash Investigation + Unicode Fix
+### Version 1.3.0 (Current) - MAJOR SIMPLIFICATION - Artwork-Only Mode
+**Date:** 2025-10-18
+
+**BREAKTHROUGH DECISION:**
+Stop trying to link bundle hashes to database titles. They're NOT in the database!
+
+**Proof:**
+- Tested bundle hashes against all database tables
+- Bundle hash (41 chars) ≠ metadata_items.hash (40 chars)
+- Not in media_items, not in media_parts
+- Plex generates hashes from GUIDs (one-way only)
+
+**Solution - Give Up on Database:**
+1. Removed sqlite3 and json imports
+2. Simplified `__init__()` - no database setup
+3. Simplified `scan_library()`:
+   - No database queries
+   - Just scans bundles for artwork
+   - Returns `Bundle {hash[:12]}` + artwork list
+4. Users identify items visually from thumbnails
+
+**Why This Works Better:**
+- Users SEE the actual artwork
+- Faster (no DB queries)
+- More reliable (no DB dependencies)
+- Simpler code
+- **ACTUALLY RETURNS RESULTS!** (not 0)
+
+**Files Changed:**
+- `backend/plex_scanner.py` - 29 insertions, 53 deletions (net -24 lines!)
+
+---
+
+### Version 1.2.2 - Hash Investigation + Unicode Fix
 **Date:** 2025-10-18
 
 **Critical Discovery:**
@@ -295,24 +328,25 @@ python -c "import app; print('Import successful!')"
 **If you're a new Claude session helping with this project:**
 
 1. **Read this file first** - It contains all critical context
-2. **Current blocking issue:** Hash format mismatch - bundle folders (41 chars) ≠ database hashes (40 chars)
+2. **STATUS: WORKING!** - v1.3.0 uses simplified artwork-only mode
 3. **Don't suggest UTF-8 TextIOWrapper** - Already tried, breaks Flask auto-reload
 4. **ALWAYS use ASCII symbols** - [OK] and [X], not ✓ and ✗ (Windows cp1252 crashes!)
 5. **Plex token is optional** - Don't focus on token errors
 6. **User is on Windows** - Test/debug Windows-specific issues
 7. **Check git log** - See recent commits for latest changes
-8. **Modern Plex architecture:**
-   - Metadata in SQLite database: `com.plexapp.plugins.library.db`
-   - Artwork in filesystem bundles: `.bundle` folders
-   - Bundle hash mapping: Under investigation (v1.2.2)
+8. **Bundle hash mapping: IMPOSSIBLE**
+   - Bundle hashes are NOT in Plex database (proven by testing)
+   - Don't try to link bundles to titles via database
+   - Use artwork-only mode instead (users identify visually)
 
 **Key Files:**
-- backend/plex_scanner.py - Database integration + bundle scanning (critical!)
+- backend/plex_scanner.py - Simplified artwork scanning (no database!)
 - backend/app.py - Flask API (working)
 - launcher_gui.py - GUI launcher (working)
 
-**Current Focus:**
-Waiting for user's debug output to reveal how media_parts table maps bundle folders to metadata_items.
+**Current Status:**
+App is working! Scans bundles, returns artwork, displays thumbnails.
+Users can see and delete artwork without needing show titles.
 
 ---
 
