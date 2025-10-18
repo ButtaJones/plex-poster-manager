@@ -1,10 +1,10 @@
 # Plex Poster Manager - Project Status
 
 **Last Updated:** October 18, 2025
-**Current Version:** 2.0.1
+**Current Version:** 2.1.0
 **Build Platform:** macOS
 **Target Platform:** Windows Plex Server
-**Status:** Production Ready with Plex API Integration
+**Status:** Production Ready with Plex API Integration + Advanced UI Features
 
 ---
 
@@ -18,7 +18,14 @@ The application is now using the **professional approach** - Plex API integratio
 - ❌ Abandoned filesystem scanning (fragile, broke with Plex updates)
 - ✅ Switched to Plex API (stable, future-proof, professional)
 
-**Latest Improvements (v2.0.1):**
+**Latest Improvements (v2.1.0):**
+- ✅ **Scan Limit Option** - Choose 100/500/1000/2000 items or all (perfect for large libraries)
+- ✅ **Thumbnail Size Slider** - Adjust display size 150-600px (like Medusa NZB)
+- ✅ **Responsive Grid Layout** - More columns when thumbnails are smaller
+- ✅ **Pagination/Load More** - Load items in batches, click "Load More" for next batch
+- ✅ **Visual Feedback** - "Showing 100 of 2262 items (22 more pages available)"
+
+**Previous Improvements (v2.0.1):**
 - Fixed token testing to use PlexAPI
 - Added auto-start servers feature
 - Windows upgrade scripts for v1.x users
@@ -206,6 +213,10 @@ Frontend opens at http://localhost:3000
 - [x] **Auto-start feature** ⭐ (v2.0.1)
 - [x] **Token testing with PlexAPI** ⭐ (v2.0.1)
 - [x] **Windows upgrade scripts** ⭐ (v2.0.1)
+- [x] **Scan limit option** ⭐ (v2.1.0)
+- [x] **Thumbnail size slider** ⭐ (v2.1.0)
+- [x] **Responsive grid layout** ⭐ (v2.1.0)
+- [x] **Pagination/Load More** ⭐ (v2.1.0)
 - [x] Cross-platform compatibility
 
 ### Testing Required
@@ -229,10 +240,15 @@ Frontend opens at http://localhost:3000
 ## Known Issues
 
 ### High Priority
-1. **Frontend Not Updated for v2.0**
-   - Status: Backend uses `plex_url`, frontend expects `plex_metadata_path`
-   - Impact: Configuration UI needs update
-   - Fix: Update ConfigModal.jsx and api.js
+1. **Token Not Persisting from Launcher to Web**
+   - Status: Token must be re-entered in web app after launcher setup
+   - Impact: User inconvenience
+   - Fix: Share config between launcher and web app
+
+2. **Local Artwork URLs (metadata:// and upload://) Return 404**
+   - Status: Plex-local artwork not displaying
+   - Impact: Some posters show as gray boxes
+   - Fix: Handle Plex internal URL schemes in thumbnail proxy
 
 ### Medium Priority
 1. **npm Security Vulnerabilities**
@@ -249,12 +265,22 @@ Frontend opens at http://localhost:3000
 2. ✅ **Token Testing Errors** - Fixed in v2.0.1 (uses PlexAPI now)
 3. ✅ **Windows Unicode Crashes** - Use ASCII symbols only
 4. ✅ **ESLint Warnings** - Fixed in v1.x
+5. ✅ **Thumbnail Size Not Changing** - Fixed in v2.1.0 (slider now controls display size)
+6. ✅ **No Pagination for Large Scans** - Fixed in v2.1.0 (Load More feature)
+7. ✅ **Frontend v2.0 Compatibility** - Fixed in v2.1.0 (ConfigModal uses plex_url)
 
 ---
 
 ## Version History Summary
 
-### v2.0.1 (Current) - Launcher Fixes
+### v2.1.0 (Current) - Advanced UI Features
+- Scan limit option (100/500/1000/2000/all items)
+- Thumbnail size slider (150-600px)
+- Responsive grid layout (adapts to thumbnail size)
+- Pagination with Load More functionality
+- Visual feedback for scan progress
+
+### v2.0.1 - Launcher Fixes
 - Fixed token testing to use PlexAPI
 - Added auto-start servers feature
 - Windows upgrade scripts
@@ -356,6 +382,6 @@ for show in library.all():
 
 ---
 
-**Status Summary:** Application is production-ready with professional Plex API integration. Frontend needs update for v2.0 configuration format. Token authentication required for all operations.
+**Status Summary:** Application is production-ready with professional Plex API integration and advanced UI features (v2.1.0). Features scan limits, pagination, responsive layouts, and customizable thumbnail sizes. Token authentication required for all operations.
 
-**Current Focus:** Testing with real Plex server and updating frontend for v2.0 compatibility.
+**Current Focus:** Fixing token persistence between launcher and web app, and handling Plex internal artwork URLs (metadata://, upload://).
