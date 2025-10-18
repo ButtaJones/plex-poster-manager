@@ -244,11 +244,21 @@ def test_plex_token():
 @app.route('/api/libraries', methods=['GET'])
 def get_libraries():
     """Get list of available Plex libraries."""
+    print("\n[API /api/libraries] Getting libraries...")
+
     if not scanner:
+        print("[API /api/libraries] ERROR: Scanner not initialized")
         return jsonify({"error": "Plex scanner not initialized. Please configure URL and token."}), 400
 
-    libraries = scanner.get_libraries()
-    return jsonify({"libraries": libraries})
+    try:
+        libraries = scanner.get_libraries()
+        print(f"[API /api/libraries] Returning {len(libraries)} libraries: {libraries}")
+        return jsonify({"libraries": libraries})
+    except Exception as e:
+        print(f"[API /api/libraries] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "libraries": []}), 500
 
 
 @app.route('/api/scan', methods=['POST'])
@@ -441,10 +451,10 @@ def search_items():
     try:
         all_items = scanner.scan_library(library)
 
-        # Filter by search query
+        # Filter by search query (access info.title due to new structure)
         filtered_items = [
             item for item in all_items
-            if query in item['title'].lower()
+            if query in item['info']['title'].lower()
         ]
 
         return jsonify({

@@ -1,28 +1,32 @@
 import React from 'react';
 
 const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete }) => {
-  const getThumbnailUrl = (path) => {
-    return `http://localhost:5000/api/thumbnail?path=${encodeURIComponent(path)}`;
+  const getThumbnailUrl = (thumbUrl) => {
+    return `http://localhost:5000/api/thumbnail?url=${encodeURIComponent(thumbUrl)}`;
   };
 
-  const formatSize = (bytes) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
-  const formatDate = (timestamp) => {
-    return new Date(timestamp * 1000).toLocaleDateString();
-  };
-
-  const getSourceBadgeColor = (source) => {
+  const getProviderBadgeColor = (provider) => {
     const colors = {
-      thetvdb: 'bg-blue-500',
-      themoviedb: 'bg-green-500',
-      local: 'bg-purple-500',
-      unknown: 'bg-gray-500',
+      'tvdb': 'bg-blue-500',
+      'tmdb': 'bg-green-500',
+      'gracenote': 'bg-purple-500',
+      'plex': 'bg-orange-500',
+      'local': 'bg-gray-500',
+      'unknown': 'bg-gray-400',
     };
-    return colors[source] || colors.unknown;
+    return colors[provider] || colors.unknown;
+  };
+
+  const getProviderName = (provider) => {
+    const names = {
+      'tvdb': 'TVDB',
+      'tmdb': 'TMDB',
+      'gracenote': 'Gracenote',
+      'plex': 'Plex',
+      'local': 'Local',
+      'unknown': 'Unknown',
+    };
+    return names[provider] || provider;
   };
 
   return (
@@ -43,22 +47,31 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete }) => {
         />
       </div>
 
-      {/* Source Badge */}
+      {/* Provider Badge */}
       <div className="absolute top-2 right-2 z-10">
         <span
-          className={`${getSourceBadgeColor(
-            artwork.source
+          className={`${getProviderBadgeColor(
+            artwork.provider
           )} text-white text-xs px-2 py-1 rounded-full font-semibold`}
         >
-          {artwork.source}
+          {getProviderName(artwork.provider)}
         </span>
       </div>
+
+      {/* Selected Badge */}
+      {artwork.selected && (
+        <div className="absolute top-2 right-2 z-20 mr-20">
+          <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full font-semibold">
+            ★ Active
+          </span>
+        </div>
+      )}
 
       {/* Thumbnail */}
       <div className="aspect-[2/3] bg-gray-200 relative group cursor-pointer">
         <img
-          src={getThumbnailUrl(artwork.path)}
-          alt={artwork.filename}
+          src={getThumbnailUrl(artwork.thumb_url)}
+          alt={`${artwork.type} - ${artwork.provider}`}
           className="w-full h-full object-cover"
           loading="lazy"
         />
@@ -76,12 +89,12 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete }) => {
 
       {/* Info */}
       <div className="p-3 bg-white">
-        <p className="text-xs text-gray-600 mb-1 truncate" title={artwork.filename}>
-          {artwork.filename}
+        <p className="text-xs text-gray-600 mb-1 capitalize">
+          {artwork.type}
         </p>
         <div className="flex justify-between text-xs text-gray-500">
-          <span>{formatSize(artwork.size)}</span>
-          <span>{formatDate(artwork.modified)}</span>
+          <span>{getProviderName(artwork.provider)}</span>
+          {artwork.selected && <span className="text-green-600 font-semibold">Active</span>}
         </div>
       </div>
     </div>
