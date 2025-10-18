@@ -2,15 +2,17 @@
 Plex Scanner Module
 Scans Plex metadata bundles and extracts artwork for management.
 
-SIMPLIFIED APPROACH (Proven by Testing):
-- Bundle folder hashes are NOT stored in Plex database
-- Plex generates bundle hashes from metadata GUIDs (one-way, not reversible)
-- This scanner simply finds bundles and extracts artwork
-- Users identify what to delete visually from thumbnails (better UX!)
-- No database lookups needed - just pure filesystem scanning
+HYBRID APPROACH (Best Solution - Thanks to Gemini & Grok LLMs!):
+- Parse Info.xml files INSIDE bundles to get real show titles (offline!)
+- Bundle hashes are NOT in database (proven by testing)
+- Info.xml files exist at: Contents/<agent>/Info.xml (e.g., com.plexapp.agents.thetvdb)
+- Fallback to bundle hash for bundles without Info.xml
+- No database queries needed - pure filesystem + XML parsing
+- Works 100% offline, no Plex token required
 """
 
 import os
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import hashlib
@@ -24,8 +26,8 @@ class PlexScanner:
         print(f"[PlexScanner] Initialized with path: {self.metadata_path}")
         print(f"[PlexScanner] Path exists: {self.metadata_path.exists()}")
         print(f"[PlexScanner] Path is directory: {self.metadata_path.is_dir() if self.metadata_path.exists() else 'N/A'}")
-        print(f"[PlexScanner] SIMPLIFIED MODE: Artwork-only scanning (no database)")
-        print(f"[PlexScanner] Users will identify items visually from thumbnails")
+        print(f"[PlexScanner] HYBRID MODE: XML parsing for real titles + artwork scanning")
+        print(f"[PlexScanner] Parses Info.xml inside bundles (offline, no database/token needed)")
 
     def debug_database(self):
         """Inspect database structure and sample data to understand schema."""
@@ -303,49 +305,44 @@ class PlexScanner:
         return bundles
     
     def parse_info_xml(self, bundle_path: Path) -> Optional[Dict]:
-        """Parse Info.xml from a bundle to extract metadata."""
-        # Try multiple possible locations for Info.xml (Plex uses different structures)
-        candidates = [
-            bundle_path / "Contents" / "Info.xml",
-            bundle_path / "Info.xml",
-            bundle_path / "Contents" / "_combined" / "Info.xml",
+        """Parse Info.xml from a bundle to extract metadata.
+
+        Checks multiple agent-specific locations:
+        - Contents/com.plexapp.agents.thetvdb/Info.xml
+        - Contents/com.plexapp.agents.themoviedb/Info.xml
+        - Contents/com.plexapp.agents.imdb/Info.xml
+        - Contents/Info.xml (fallback)
+        """
+        # Try agent-specific locations first (most reliable)
+        agent_candidates = [
             bundle_path / "Contents" / "com.plexapp.agents.thetvdb" / "Info.xml",
-            bundle_path / "Contents" / "com.plexapp.agents.themoviedb" / "Info.xml"
+            bundle_path / "Contents" / "com.plexapp.agents.themoviedb" / "Info.xml",
+            bundle_path / "Contents" / "com.plexapp.agents.imdb" / "Info.xml",
+            bundle_path / "Contents" / "com.plexapp.agents.localmedia" / "Info.xml"
         ]
 
-        if self.detailed_logging:
-            print(f"\n[parse_info_xml] Parsing bundle: {bundle_path.name}")
+        # Fallback locations
+        fallback_candidates = [
+            bundle_path / "Contents" / "Info.xml",
+            bundle_path / "Info.xml",
+            bundle_path / "Contents" / "_combined" / "Info.xml"
+        ]
+
+        candidates = agent_candidates + fallback_candidates
 
         for info_path in candidates:
-            if self.detailed_logging:
-                print(f"[parse_info_xml]   Trying: {info_path}")
             if info_path.exists():
-                if self.detailed_logging:
-                    print(f"[parse_info_xml]   [OK] FOUND at: {info_path}")
                 try:
-                    # Read and show first part of file for debugging (only if detailed logging)
-                    if self.detailed_logging:
-                        with open(info_path, 'r', encoding='utf-8') as f:
-                            first_chars = f.read(500)
-                            print(f"[parse_info_xml]   First 500 chars of XML:")
-                            print(f"   {first_chars[:500]}")
-
                     # Parse the XML
                     tree = ET.parse(info_path)
                     root = tree.getroot()
-
-                    if self.detailed_logging:
-                        print(f"[parse_info_xml]   Root tag: {root.tag}")
-                        print(f"[parse_info_xml]   Root attribs: {root.attrib}")
 
                     # Try different XML structures that Plex might use
 
                     # Structure 1: MediaContainer > Directory
                     directory = root.find(".//Directory")
                     if directory is not None:
-                        if self.detailed_logging:
-                            print(f"[parse_info_xml]   Found <Directory> element")
-                        result = {
+                        return {
                             "title": directory.attrib.get("title", "Unknown"),
                             "type": directory.attrib.get("type", "unknown"),
                             "key": directory.attrib.get("key", ""),
@@ -353,18 +350,13 @@ class PlexScanner:
                             "year": directory.attrib.get("year", ""),
                             "guid": directory.attrib.get("guid", ""),
                             "rating_key": directory.attrib.get("ratingKey", ""),
-                            "info_xml_path": str(info_path)
+                            "studio": ""
                         }
-                        if self.detailed_logging:
-                            print(f"[parse_info_xml]   [OK] Successfully parsed: {result['title']}")
-                        return result
 
                     # Structure 2: MediaContainer > Video
                     video = root.find(".//Video")
                     if video is not None:
-                        if self.detailed_logging:
-                            print(f"[parse_info_xml]   Found <Video> element")
-                        result = {
+                        return {
                             "title": video.attrib.get("title", "Unknown"),
                             "type": video.attrib.get("type", "unknown"),
                             "key": video.attrib.get("key", ""),
@@ -372,17 +364,12 @@ class PlexScanner:
                             "year": video.attrib.get("year", ""),
                             "guid": video.attrib.get("guid", ""),
                             "rating_key": video.attrib.get("ratingKey", ""),
-                            "info_xml_path": str(info_path)
+                            "studio": ""
                         }
-                        if self.detailed_logging:
-                            print(f"[parse_info_xml]   [OK] Successfully parsed: {result['title']}")
-                        return result
 
                     # Structure 3: Root IS MediaContainer with attributes
                     if root.tag == "MediaContainer" and root.attrib:
-                        if self.detailed_logging:
-                            print(f"[parse_info_xml]   Root is MediaContainer with attributes")
-                        result = {
+                        return {
                             "title": root.attrib.get("title", root.attrib.get("title1", "Unknown")),
                             "type": root.attrib.get("type", "unknown"),
                             "key": root.attrib.get("key", ""),
@@ -390,33 +377,14 @@ class PlexScanner:
                             "year": root.attrib.get("year", ""),
                             "guid": root.attrib.get("guid", ""),
                             "rating_key": root.attrib.get("ratingKey", ""),
-                            "info_xml_path": str(info_path)
+                            "studio": ""
                         }
-                        if self.detailed_logging:
-                            print(f"[parse_info_xml]   [OK] Successfully parsed: {result['title']}")
-                        return result
 
-                    # If we get here, we found XML but couldn't parse it
-                    if self.detailed_logging:
-                        print(f"[parse_info_xml]   [X] Found XML but couldn't parse structure")
-                        print(f"[parse_info_xml]   Available elements:")
-                        for child in root:
-                            print(f"     - {child.tag}: {child.attrib}")
-
-                except ET.ParseError as e:
-                    if self.detailed_logging:
-                        print(f"[parse_info_xml]   [X] XML Parse Error: {e}")
+                except (ET.ParseError, Exception):
+                    # Failed to parse this XML, try next candidate
                     continue
-                except Exception as e:
-                    if self.detailed_logging:
-                        print(f"[parse_info_xml]   [X] Unexpected error: {e}")
-                    continue
-            else:
-                if self.detailed_logging:
-                    print(f"[parse_info_xml]   [X] Not found")
 
-        if self.detailed_logging:
-            print(f"[parse_info_xml]   [X] No valid Info.xml found in any location")
+        # No valid Info.xml found
         return None
     
     def get_artwork_files(self, bundle_path: Path) -> Dict[str, List[Dict]]:
@@ -487,20 +455,21 @@ class PlexScanner:
     def scan_library(self, library: str = "TV Shows", progress_callback=None) -> List[Dict]:
         """Scan an entire library and return all items with their artwork.
 
-        SIMPLIFIED APPROACH:
-        - Bundle folder names are NOT in the database (proven by testing)
-        - Just return artwork grouped by bundle
-        - Users can visually identify what to delete from thumbnails
-        - This is actually BETTER UX than trying to show titles!
+        HYBRID APPROACH (Best of Both Worlds):
+        - Parse Info.xml files in bundles to get real show titles (offline, no database!)
+        - Fallback to bundle hash for bundles without Info.xml
+        - Users see real titles when available, visual identification when not
         """
         print(f"\n[scan_library] Starting scan of library: '{library}'")
-        print(f"[scan_library] SIMPLIFIED MODE: Artwork-only (no database lookups)")
+        print(f"[scan_library] HYBRID MODE: XML parsing for titles + artwork scanning")
         bundles = self.find_bundles(library)
         total = len(bundles)
         print(f"[scan_library] Found {total} bundles to process")
 
         results = []
         bundles_without_artwork = 0
+        xml_title_count = 0
+        hash_title_count = 0
 
         for idx, bundle_path in enumerate(bundles):
             if progress_callback:
@@ -514,18 +483,23 @@ class PlexScanner:
             artwork = self.get_artwork_files(bundle_path)
             total_artwork = sum(len(v) for v in artwork.values())
 
-            if idx < 5:
-                print(f"[scan_library] Found {total_artwork} artwork files")
-
             if total_artwork > 0:
-                # Extract bundle hash for display
+                # Extract bundle hash for fallback
                 bundle_hash = bundle_path.name.replace('.bundle', '')
 
-                # Return simple bundle info
-                results.append({
-                    "bundle_path": str(bundle_path),
-                    "bundle_name": bundle_path.name,
-                    "info": {
+                # Try to get title from Info.xml in bundle
+                xml_info = self.parse_info_xml(bundle_path)
+
+                if xml_info:
+                    # Use real title from XML!
+                    info = xml_info
+                    xml_title_count += 1
+                    if idx < 5:
+                        print(f"[scan_library] Title from XML: {info['title']}")
+                        print(f"[scan_library] Found {total_artwork} artwork files")
+                else:
+                    # Fallback to bundle hash
+                    info = {
                         "title": f"Bundle {bundle_hash[:12]}",
                         "type": "unknown",
                         "year": "",
@@ -533,7 +507,16 @@ class PlexScanner:
                         "guid": "",
                         "rating_key": "",
                         "parent_title": ""
-                    },
+                    }
+                    hash_title_count += 1
+                    if idx < 5:
+                        print(f"[scan_library] No XML found, using hash: {info['title']}")
+                        print(f"[scan_library] Found {total_artwork} artwork files")
+
+                results.append({
+                    "bundle_path": str(bundle_path),
+                    "bundle_name": bundle_path.name,
+                    "info": info,
                     "artwork": artwork,
                     "total_artwork": total_artwork
                 })
@@ -545,6 +528,8 @@ class PlexScanner:
         print(f"  - Total bundles scanned: {total}")
         print(f"  - Bundles with artwork (returned): {len(results)}")
         print(f"  - Bundles without artwork (skipped): {bundles_without_artwork}")
+        print(f"  - Titles from XML (real titles): {xml_title_count}")
+        print(f"  - Titles from hash (fallback): {hash_title_count}")
 
         return results
     
