@@ -1,10 +1,15 @@
 """
 Plex Scanner Module
 Scans Plex metadata bundles and extracts information about shows, seasons, and their artwork.
+
+ARCHITECTURE (Modern Plex):
+- Metadata (titles, summaries) stored in SQLite database
+- Artwork (posters, backgrounds) stored in filesystem bundles
+- Bundle hash maps to database hash column
 """
 
 import os
-import xml.etree.ElementTree as ET
+import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import json
@@ -15,10 +20,16 @@ class PlexScanner:
     def __init__(self, metadata_path: str):
         self.metadata_path = Path(metadata_path)
         self.cache = {}
-        self.detailed_logging = True  # Will be toggled during scanning
+
+        # Find Plex database (go up from Metadata/ to Plex Media Server root)
+        plex_root = self.metadata_path.parent.parent
+        self.db_path = plex_root / "Plug-in Support" / "Databases" / "com.plexapp.plugins.library.db"
+
         print(f"[PlexScanner] Initialized with path: {self.metadata_path}")
         print(f"[PlexScanner] Path exists: {self.metadata_path.exists()}")
         print(f"[PlexScanner] Path is directory: {self.metadata_path.is_dir() if self.metadata_path.exists() else 'N/A'}")
+        print(f"[PlexScanner] Database path: {self.db_path}")
+        print(f"[PlexScanner] Database exists: {self.db_path.exists()}")
 
     def validate_path(self) -> bool:
         """Validate that the provided path exists and looks like a Plex metadata directory."""
@@ -62,6 +73,83 @@ class PlexScanner:
                 libraries.append(item.name)
         return libraries
     
+    def get_title_from_db(self, bundle_hash: str) -> Dict:
+        """Get title and metadata from Plex database by bundle hash.
+
+        Args:
+            bundle_hash: The bundle folder name without .bundle extension
+
+        Returns:
+            Dict with title, type, year, etc. from database
+        """
+        if not self.db_path.exists():
+            print(f"[get_title_from_db] Database not found, using hash as title")
+            return {
+                "title": f"Bundle {bundle_hash[:12]}",
+                "type": "unknown",
+                "year": "",
+                "studio": "",
+                "guid": "",
+                "rating_key": "",
+                "parent_title": ""
+            }
+
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+
+            # Query metadata_items table by hash
+            cursor.execute("""
+                SELECT title, metadata_type, year, studio, summary, guid, id
+                FROM metadata_items
+                WHERE hash = ?
+                LIMIT 1
+            """, (bundle_hash,))
+
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                title, meta_type, year, studio, summary, guid, item_id = result
+
+                # Map metadata_type to string
+                type_map = {1: "movie", 2: "show", 3: "season", 4: "episode"}
+                type_str = type_map.get(meta_type, "unknown")
+
+                return {
+                    "title": title or f"Bundle {bundle_hash[:12]}",
+                    "type": type_str,
+                    "year": str(year) if year else "",
+                    "studio": studio or "",
+                    "guid": guid or "",
+                    "rating_key": str(item_id) if item_id else "",
+                    "parent_title": ""
+                }
+            else:
+                # Hash not found in database
+                print(f"[get_title_from_db] Hash {bundle_hash[:12]}... not in database")
+                return {
+                    "title": f"Bundle {bundle_hash[:12]}",
+                    "type": "unknown",
+                    "year": "",
+                    "studio": "",
+                    "guid": "",
+                    "rating_key": "",
+                    "parent_title": ""
+                }
+
+        except Exception as e:
+            print(f"[get_title_from_db] Error querying database: {e}")
+            return {
+                "title": f"Bundle {bundle_hash[:12]}",
+                "type": "unknown",
+                "year": "",
+                "studio": "",
+                "guid": "",
+                "rating_key": "",
+                "parent_title": ""
+            }
+
     def find_bundles(self, library: str = "TV Shows") -> List[Path]:
         """Find all .bundle directories in a library."""
         print(f"\n[find_bundles] Looking for bundles in library: '{library}'")
@@ -278,52 +366,63 @@ class PlexScanner:
     def scan_library(self, library: str = "TV Shows", progress_callback=None) -> List[Dict]:
         """Scan an entire library and return all items with their artwork.
 
-        NOTE: Modern Plex (newer versions) don't use Info.xml files anymore!
-        They use SQLite database instead. This scanner works without Info.xml
-        by using bundle hashes as identifiers.
+        Modern Plex Architecture:
+        - Metadata (titles, etc.) stored in SQLite database
+        - Artwork stored in filesystem bundles
+        - This scanner queries database for titles + filesystem for artwork
         """
         print(f"\n[scan_library] Starting scan of library: '{library}'")
-        print(f"[scan_library] NOTE: Skipping Info.xml parsing (modern Plex uses database)")
+        print(f"[scan_library] Using Plex database for titles + filesystem for artwork")
         bundles = self.find_bundles(library)
         total = len(bundles)
         print(f"[scan_library] Found {total} bundles to process")
 
+        if self.db_path.exists():
+            print(f"[scan_library] Database found: {self.db_path}")
+        else:
+            print(f"[scan_library] WARNING: Database not found at {self.db_path}")
+            print(f"[scan_library] Will use bundle hashes as titles")
+
         results = []
         bundles_without_artwork = 0
+        db_hits = 0
+        db_misses = 0
 
         for idx, bundle_path in enumerate(bundles):
             if progress_callback:
                 progress_callback(idx + 1, total)
 
-            # Print progress every 100 bundles
+            # Print progress every 100 bundles or first 5
             if idx % 100 == 0 or idx < 5:
                 print(f"\n[scan_library] Processing bundle {idx+1}/{total}: {bundle_path.name}")
 
             # Extract bundle hash (filename without .bundle extension)
             bundle_hash = bundle_path.name.replace('.bundle', '')
 
-            # Get artwork directly - no Info.xml needed!
+            # Get title from database
+            info = self.get_title_from_db(bundle_hash)
+
+            # Track database hits/misses
+            if info["title"].startswith("Bundle "):
+                db_misses += 1
+            else:
+                db_hits += 1
+
+            # Get artwork from filesystem
             artwork = self.get_artwork_files(bundle_path)
             total_artwork = sum(len(v) for v in artwork.values())
 
             if idx < 5:
                 print(f"[scan_library] Bundle hash: {bundle_hash[:16]}...")
+                print(f"[scan_library] Title from DB: {info['title']}")
                 print(f"[scan_library] Found {total_artwork} artwork files")
 
             if total_artwork > 0:
-                # Use bundle hash as identifier (no Info.xml needed)
+                # Combine database info + filesystem artwork
                 results.append({
                     "bundle_path": str(bundle_path),
                     "bundle_name": bundle_path.name,
-                    "info": {
-                        "title": f"Bundle {bundle_hash[:12]}",  # Short hash as title
-                        "type": "bundle",
-                        "hash": bundle_hash,
-                        "rating_key": "",
-                        "guid": "",
-                        "year": "",
-                        "parent_title": ""
-                    },
+                    "info": info,  # Real title from database!
                     "artwork": artwork,
                     "total_artwork": total_artwork
                 })
@@ -335,9 +434,8 @@ class PlexScanner:
         print(f"  - Total bundles scanned: {total}")
         print(f"  - Bundles with artwork (returned): {len(results)}")
         print(f"  - Bundles without artwork (skipped): {bundles_without_artwork}")
-        print(f"[scan_library] NOTE: Modern Plex doesn't use Info.xml")
-        print(f"[scan_library] Using bundle hashes as identifiers")
-        print(f"[scan_library] Future update: Add Plex database lookup for real titles")
+        print(f"  - Database hits (real titles): {db_hits}")
+        print(f"  - Database misses (hash titles): {db_misses}")
 
         return results
     
