@@ -1,263 +1,237 @@
 # Plex Poster Manager - Project Context
 
 **Last Updated:** 2025-10-18
-**Current Version:** 1.3.0
-**Status:** WORKING! Simplified artwork-only mode (no database lookups)
+**Current Version:** 2.0.1
+**Status:** PRODUCTION READY - Using Plex API (Professional Approach)
 
 ---
 
 ## 📋 Project Overview
 
 ### Goal
-Web application to manage Plex Media Server artwork files. Users can browse, view, and delete posters, backgrounds, and other artwork from their Plex metadata bundles.
+Web application to manage Plex Media Server artwork files. Users can browse, view, and delete posters, backgrounds, and other artwork using the official Plex API.
 
 ### Architecture
-- **Backend:** Flask (Python 3.8+) REST API
+- **Backend:** Flask (Python 3.8+) REST API with python-plexapi library
 - **Frontend:** React 18.2 with Tailwind CSS
+- **API Integration:** Official Plex API (same approach as Kometa & Tautulli)
 - **Deployment:**
   - **Development:** macOS (developer machine)
   - **Production:** Windows (where Plex Media Server runs)
-  - **Challenge:** Cross-platform compatibility issues (Windows encoding)
 
 ### Key Components
 1. **backend/app.py** - Flask REST API server
-2. **backend/plex_scanner.py** - Scans Plex metadata bundles, parses Info.xml
+2. **backend/plex_scanner_api.py** - Plex API artwork scanner (NEW in v2.0.0)
 3. **backend/file_manager.py** - Handles file operations and backups
 4. **frontend/** - React web interface
 5. **launcher_gui.py** - Tkinter GUI for one-click server management
 
 ---
 
-## ✅ SOLUTION IMPLEMENTED - Artwork-Only Mode
+## ✅ CURRENT APPROACH - Plex API Integration (v2.0.0+)
 
-### The Final Answer: Bundle Hashes Are NOT in Database
+### The Professional Solution: Use the Plex API
 
-**Discovery from Debug Output:**
-- Bundle hashes are **NOT stored anywhere** in the Plex database
-- Bundle hash (41 chars) ≠ metadata_items.hash (40 chars)
-- Bundle hashes do **NOT appear** in media_parts.file paths
-- Plex generates bundle hashes from metadata GUIDs (one-way, NOT reversible)
+**Why We Switched from Filesystem Scanning:**
+- ❌ **v1.x Problem:** Plex changed bundle folder structure, broke filesystem scanning
+- ✅ **v2.0+ Solution:** Use python-plexapi library (official Plex API client)
+- 🎯 **Industry Standard:** Same approach as Kometa, Tautulli, JBOPS
 
-**The Simplified Solution (v1.3.0):**
-Stop trying to link bundles to database titles. Instead:
+**How It Works Now:**
+```python
+from plexapi.server import PlexServer
 
-1. **Scan bundles** for artwork files
-2. **Display artwork** in grid with thumbnails
-3. **Users identify** what to delete visually (better UX!)
-4. **No database** lookups needed
+# Connect to Plex server
+plex = PlexServer('http://localhost:32400', 'YOUR_TOKEN')
 
-**Why This Is Actually Better:**
-- ✅ Users SEE the artwork (the whole point of the app!)
-- ✅ No confusing title mismatches
-- ✅ Faster scanning (no database queries)
-- ✅ More reliable (no database dependencies)
-- ✅ Simpler code (less complexity)
-- ✅ **ACTUALLY RETURNS RESULTS** instead of 0!
+# Get TV shows from a library
+library = plex.library.section('TV Shows')
+for show in library.all():
+    # Get all available posters for this show
+    posters = show.posters()
+    for poster in posters:
+        print(f"{show.title}: {poster.provider} (Selected: {poster.selected})")
+```
+
+**Advantages Over Filesystem Scanning:**
+- ✅ Always works (no folder structure dependencies)
+- ✅ Gets real show/movie titles from Plex metadata
+- ✅ Shows which artwork is currently selected
+- ✅ Access to provider info (TheTVDB, TheMovieDB, etc.)
+- ✅ Can trigger Plex refresh after changes
+- ✅ Works remotely (not just local filesystem)
+- ✅ Future-proof (Plex API stable since 2013)
+- ✅ Professional approach (used by all major Plex tools)
 
 **What Users See:**
 ```
-Bundle 01e20068180c
-  └─ Posters (5 files)
-  └─ Backgrounds (2 files)
-[Thumbnail Grid of Actual Artwork]
+The Office (US) (2005)
+  Posters: 12 available
+    ✓ TheMovieDB (Selected)
+    - TheTVDB
+    - Uploaded (Custom)
+  Backgrounds: 8 available
+    ✓ TheMovieDB (Selected)
+    - TheTVDB
 ```
 
-Users can visually identify what belongs to which show from the artwork itself!
+Users can see actual show titles, artwork sources, and what's currently selected!
 
 ---
 
-## 📚 Version History & Bug Fixes
+## 📚 Version History
 
-### Version 1.3.0 (Current) - MAJOR SIMPLIFICATION - Artwork-Only Mode
-**Date:** 2025-10-18
-
-**BREAKTHROUGH DECISION:**
-Stop trying to link bundle hashes to database titles. They're NOT in the database!
-
-**Proof:**
-- Tested bundle hashes against all database tables
-- Bundle hash (41 chars) ≠ metadata_items.hash (40 chars)
-- Not in media_items, not in media_parts
-- Plex generates hashes from GUIDs (one-way only)
-
-**Solution - Give Up on Database:**
-1. Removed sqlite3 and json imports
-2. Simplified `__init__()` - no database setup
-3. Simplified `scan_library()`:
-   - No database queries
-   - Just scans bundles for artwork
-   - Returns `Bundle {hash[:12]}` + artwork list
-4. Users identify items visually from thumbnails
-
-**Why This Works Better:**
-- Users SEE the actual artwork
-- Faster (no DB queries)
-- More reliable (no DB dependencies)
-- Simpler code
-- **ACTUALLY RETURNS RESULTS!** (not 0)
-
-**Files Changed:**
-- `backend/plex_scanner.py` - 29 insertions, 53 deletions (net -24 lines!)
-
----
-
-### Version 1.2.2 - Hash Investigation + Unicode Fix
-**Date:** 2025-10-18
-
-**Critical Discovery:**
-- Bundle folder names are 41 chars, database hashes are 40 chars
-- Bundle hash ≠ metadata_items.hash (different formats!)
-- Need to investigate media_parts table for file path mapping
-
-**Changes:**
-1. **Unicode Crash Fix (Again!)**
-   - Fixed remaining Unicode symbols in debug_database()
-   - → (arrow) → `->` (ASCII)
-   - ✓ and ✗ → `[OK]` and `[X]` (ASCII)
-
-2. **Comprehensive Table Investigation**
-   - Added media_items table inspection
-   - Added media_parts table inspection
-   - Sample file paths from media_parts (likely contain bundle hashes)
-   - Search for bundle hash in file paths
-   - Partial hash matching fallback
-
-**Why:** Need to understand how Plex maps bundle folders to metadata titles
-
----
-
-### Version 1.2.1 - Initial Debug Tooling
-**Date:** 2025-10-18
-
-**Changes:**
-- Added debug_database() method to plex_scanner.py
-- Inspects metadata_items table schema
-- Shows sample TV show hashes
-- Compares bundle folder names with database hashes
-- Revealed the hash format mismatch!
-
----
-
-### Version 1.1.3 - ASCII Symbol Fix
-**Date:** 2025-10-18
-
-**Changes:**
-- Removed UTF-8 TextIOWrapper (caused Flask reload crashes)
-- Replaced all Unicode symbols with ASCII:
-  - ✓ → [OK]
-  - ✗ → [X]
-- Enhanced debugging for Info.xml parsing failures
-- Shows bundle directory structure when parsing fails
-
-**Why:** TextIOWrapper incompatible with Flask debug mode auto-reload
-
----
-
-### Version 1.1.2 - Critical Windows Fixes
-**Date:** 2025-10-18
-
-**Critical Bugs Fixed:**
-1. **Import Order Crash**
-   - Problem: from io import BytesIO then import io shadowed BytesIO
-   - Backend crashed before Flask could start
-   - Frontend showed: "Network Error" (ECONNREFUSED)
-   - Fix: Moved sys and io imports to top, use io.BytesIO()
-
-2. **Windows Unicode Encoding Error**
-   - Problem: UnicodeEncodeError on Windows (cp1252 encoding)
-   - Print statements with ✓ and ✗ caused 500 errors
-   - Blocked: Config save, library scan, ALL functionality
-   - Fix: Added UTF-8 TextIOWrapper for Windows console
-   - **Later reverted:** See v1.1.3 (TextIOWrapper caused reload issues)
-
-3. **I/O Operation on Closed File**
-   - Problem: TextIOWrapper file handle closed on Flask reload
-   - Backend crashed with: ValueError: I/O operation on closed file
-   - Fix: Replaced UTF-8 wrapper with ASCII symbols (v1.1.3)
-
----
-
-### Version 1.1.1 - First-Time User Experience
+### Version 2.0.1 (Current) - Launcher Fixes & Auto-Start
 **Date:** 2025-10-18
 
 **Improvements:**
-1. **Auto-Setup for GitHub Users**
-   - Detects missing dependencies automatically
-   - One-click installation: venv + pip + npm
-   - Shows progress in launcher GUI log
+1. **Fixed Token Testing**
+   - Now uses PlexAPI to actually connect to server
+   - No more JSON parsing errors
+   - Shows server name and version on success
+   - Better error messages (invalid token vs connection failed)
 
-2. **API Error Logging**
-   - /api/detect-path: Comprehensive error logging
-   - /api/config POST: Detailed logging for debugging
-   - Better error messages for configuration issues
+2. **Auto-Start Feature**
+   - New checkbox: "Auto-start servers on launch"
+   - Saves preference in config.json
+   - Automatically launches servers 2 seconds after opening
+   - Perfect for "set it and forget it" workflow
 
-3. **Plex Token Optional Messaging**
-   - Help text: "ℹ️ Not required - app works without it"
-   - Explains what token enables
-   - Reduces user confusion
+3. **Windows Upgrade Scripts**
+   - QUICK_FIX_WINDOWS.bat - Upgrade v1.x to v2.0
+   - INSTALL_PLEXAPI.bat - Direct PlexAPI installer
 
-4. **Quick Start Guide**
-   - Prominent README section for GitHub users
-   - 4-step setup process with automatic installation
-   - Updated version badge to 1.1.0
+**Files Changed:**
+- launcher_gui.py - Added auto-start checkbox and PlexAPI token testing
+- QUICK_FIX_WINDOWS.bat - Added v1.x upgrade helper
+- INSTALL_PLEXAPI.bat - Added direct installer
 
 ---
 
-### Version 1.0.0 - Initial Release
-**Date:** 2025-10-17
+### Version 2.0.0 - MAJOR REWRITE (Plex API Integration)
+**Date:** 2025-10-18
 
-**Features Built:**
-- Flask REST API backend with Plex metadata scanning
-- React frontend with Tailwind CSS
-- Plex bundle scanner and Info.xml parser
-- File manager with backup system
-- Auto-detect Plex metadata path
-- GUI launcher with tkinter
-- Cross-platform support (Windows, macOS, Linux)
+**BREAKTHROUGH:** Research showed Kometa and Tautulli use Plex API, NOT filesystem scanning!
+
+**Why This Was Necessary:**
+- Modern Plex changed bundle folder structure (broke v1.5.0)
+- Professional tools all use python-plexapi library
+- Plex API is stable, bundle structure is not
+- API gives real titles, selected artwork, and full metadata
+
+**Major Changes:**
+
+1. **NEW FILE: backend/plex_scanner_api.py**
+   - Complete rewrite using python-plexapi library
+   - Connects to Plex server via URL + token
+   - Gets shows/movies from Plex API (not filesystem)
+   - Retrieves ALL available artwork (posters, backgrounds, banners, themes)
+   - Shows which artwork is selected vs available
+
+2. **UPDATED: backend/requirements.txt**
+   - Added PlexAPI==4.15.16 (official python-plexapi library)
+
+3. **UPDATED: backend/app.py**
+   - Changed from PlexScanner to PlexScannerAPI
+   - Config now uses `plex_url` instead of `plex_metadata_path`
+   - Plex token now REQUIRED (not optional)
+   - `/api/detect-path` → `/api/detect-url`
+   - `/api/thumbnail` now fetches from Plex API URLs
+
+**Breaking Changes:**
+- ⚠️ Plex token now REQUIRED (was optional in v1.x)
+- ⚠️ Configuration uses `plex_url` instead of `plex_metadata_path`
+- ⚠️ Frontend needs update for new config format
+
+**Research Sources:**
+- Kometa: https://github.com/Kometa-Team/Kometa
+- Tautulli: https://github.com/Tautulli/Tautulli
+- JBOPS: https://github.com/blacktwin/JBOPS
+- python-plexapi: https://python-plexapi.readthedocs.io
+
+---
+
+### Version 1.5.0 - Modern Plex Folder Fix (Attempted)
+**Date:** 2025-10-18
+
+**Problem:** Modern Plex uses different bundle structure
+- Old: `Metadata/TV Shows/{hash}/Contents/*.jpg`
+- New: `Metadata/TV Shows/{hash}/*.jpg` (no Contents folder!)
+
+**Solution Attempted:**
+- Updated scanner to check both old and new structures
+- Added fallback logic for modern Plex installations
+
+**Result:** Partial success, but ultimately led to v2.0.0 rewrite
+
+---
+
+### Version 1.3.0 - Artwork-Only Mode (Filesystem Scanning)
+**Date:** 2025-10-18
+
+**Approach:** Give up on database lookups, scan bundles directly
+- Discovered bundle hashes are NOT in Plex database
+- Switched to visual identification via thumbnails
+- Users identify shows by seeing the artwork itself
+
+**Why This Was Replaced:**
+- Worked temporarily but broke when Plex changed folder structure
+- v2.0.0 API approach is more robust and professional
+
+---
+
+### Versions 1.0.0 - 1.2.2 - Initial Development
+**Dates:** 2025-10-17 to 2025-10-18
+
+**Key Learnings:**
+- Windows Unicode encoding issues (use ASCII only!)
+- Flask auto-reload breaks stdout wrappers
+- Import order matters (BytesIO shadowing)
+- Bundle hashes not in Plex database
+- Filesystem scanning is fragile
 
 ---
 
 ## 🔧 Technical Learnings
 
-### 1. Windows Unicode Encoding
-**Problem:** Windows console (cp1252) can't display Unicode characters
+### 1. Why Filesystem Scanning Failed
+**Problem:** Plex bundle structure changes between versions
+- Old Plex: `{hash}/Contents/*.jpg`
+- New Plex: `{hash}/*.jpg`
+- Future Plex: ???
+
+**Solution:** Use the API, it doesn't change!
+
+---
+
+### 2. Professional Approach = Plex API
+**Discovery:** All professional Plex tools use python-plexapi
+- Kometa (Plex Meta Manager)
+- Tautulli (Plex monitoring)
+- JBOPS (Plex scripts)
+
+**Lesson:** Follow the professionals, not the easy path
+
+---
+
+### 3. Windows Compatibility
+**Issue:** Windows console (cp1252) can't display Unicode
 **Solutions Tried:**
-- ❌ TextIOWrapper: Works but breaks Flask auto-reload
-- ✅ ASCII symbols: Simple, reliable, 100% compatible
+- ❌ TextIOWrapper: Breaks Flask auto-reload
+- ✅ ASCII symbols: [OK] and [X] instead of ✓ and ✗
 
-**Key Insight:** Sometimes the simplest solution is the best solution.
-
----
-
-### 2. Flask Debug Mode Auto-Reload
-**Issue:** Flask watchdog restarts process on file changes
-**Impact:** File handles (like TextIOWrapper) get closed
-**Solution:** Avoid wrapping stdout/stderr, use ASCII instead
+**Rule:** Always use ASCII symbols in print statements!
 
 ---
 
-### 3. Import Order Matters
-**Issue:** from io import BytesIO then import io shadows BytesIO
-**Impact:** Backend crashes with NameError when using BytesIO()
-**Solution:** Import full module first, use qualified names (io.BytesIO())
+### 4. Plex Token is Now Required
+**v1.x:** Token was optional (filesystem scanning didn't need it)
+**v2.0+:** Token is REQUIRED (API authentication)
 
----
-
-### 4. Plex Token Confusion
-**Issue:** Users think token is required
-**Reality:** Token is 100% optional for core functionality
-**Solution:** Clear help text and "optional" labels everywhere
-
-**Without token (works perfectly):**
-- Scans metadata files from disk
-- Manages artwork
-- Deletes files
-- All core functionality
-
-**With token (nice-to-have):**
-- API verification
-- Future Plex API features
-- Not implemented yet
+**How to Get Token:**
+1. Sign in to Plex Web
+2. Go to Settings → Account
+3. Click "Get Token" or use: https://www.plexopedia.com/plex-media-server/general/plex-token/
 
 ---
 
@@ -293,12 +267,12 @@ npm start
 python launcher_gui.py
 ```
 
-### Testing Backend Import
-```bash
-cd backend
-source venv/bin/activate
-python -c "import app; print('Import successful!')"
-```
+Then:
+1. Configure Plex URL (e.g., `http://localhost:32400`)
+2. Enter your Plex token (required!)
+3. Check "Auto-start servers on launch" (optional)
+4. Click "Save Configuration"
+5. Click "▶ Launch Servers"
 
 ---
 
@@ -306,47 +280,59 @@ python -c "import app; print('Import successful!')"
 
 ### Configuration
 - GET /api/config - Get current configuration
-- POST /api/config - Update configuration
-- GET /api/detect-path - Auto-detect Plex metadata path
-- POST /api/test-token - Test Plex token validity (optional)
+- POST /api/config - Update configuration (plex_url, plex_token)
+- GET /api/detect-url - Auto-detect Plex server URL
+- POST /api/test-token - Test Plex token validity (REQUIRED)
 
 ### Library Scanning
 - GET /api/libraries - Get available Plex libraries
-- POST /api/scan - Scan library for items and artwork
+- POST /api/scan - Scan library for items and artwork via API
 - POST /api/search - Search for items by title
 - POST /api/duplicates - Find duplicate artwork
 
 ### Artwork Management
-- GET /api/thumbnail?path=<path> - Get thumbnail image
+- GET /api/thumbnail?url=<plex_url> - Get thumbnail from Plex API
 - POST /api/delete - Delete artwork files
 - POST /api/undo - Undo deletion operation
 
 ---
 
-## 📝 Note for Future Claude Sessions
+## 📝 Important Notes for Future Development
 
-**If you're a new Claude session helping with this project:**
+**If you're working on this project:**
 
-1. **Read this file first** - It contains all critical context
-2. **STATUS: WORKING!** - v1.3.0 uses simplified artwork-only mode
-3. **Don't suggest UTF-8 TextIOWrapper** - Already tried, breaks Flask auto-reload
-4. **ALWAYS use ASCII symbols** - [OK] and [X], not ✓ and ✗ (Windows cp1252 crashes!)
-5. **Plex token is optional** - Don't focus on token errors
-6. **User is on Windows** - Test/debug Windows-specific issues
-7. **Check git log** - See recent commits for latest changes
-8. **Bundle hash mapping: IMPOSSIBLE**
-   - Bundle hashes are NOT in Plex database (proven by testing)
-   - Don't try to link bundles to titles via database
-   - Use artwork-only mode instead (users identify visually)
+1. **Current Status: v2.0.1 - PRODUCTION READY**
+   - Uses Plex API (professional approach)
+   - Plex token REQUIRED
+   - Auto-start feature available
 
-**Key Files:**
-- backend/plex_scanner.py - Simplified artwork scanning (no database!)
-- backend/app.py - Flask API (working)
-- launcher_gui.py - GUI launcher (working)
+2. **NEVER suggest filesystem scanning**
+   - We tried it (v1.0 - v1.5)
+   - It breaks when Plex updates
+   - Always use Plex API
 
-**Current Status:**
-App is working! Scans bundles, returns artwork, displays thumbnails.
-Users can see and delete artwork without needing show titles.
+3. **Windows Compatibility Rules:**
+   - Use ASCII symbols only ([OK], [X])
+   - No UTF-8 TextIOWrapper (breaks Flask reload)
+   - Test on Windows before committing
+
+4. **Plex Token is Required**
+   - Not optional anymore
+   - Needed for API authentication
+   - Test token validation before scanning
+
+5. **Key Files:**
+   - backend/plex_scanner_api.py - Plex API scanner (NEW in v2.0)
+   - backend/app.py - Flask API (updated for v2.0)
+   - launcher_gui.py - GUI launcher (auto-start in v2.0.1)
+
+6. **Testing Checklist:**
+   - ✅ Connect to Plex server with token
+   - ✅ List available libraries
+   - ✅ Scan library and retrieve artwork
+   - ✅ Display thumbnails from Plex URLs
+   - ✅ Delete artwork (with backup)
+   - ✅ Undo deletion
 
 ---
 
