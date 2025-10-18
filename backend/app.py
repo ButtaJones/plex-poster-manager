@@ -162,31 +162,37 @@ def test_plex_token():
     print(f"\n[test-token] Testing token: {token[:10]}...")
 
     try:
+        # Try both header and query param methods for compatibility
         response = requests.get(
-            "https://plex.tv/api/v2/user",
-            headers={"X-Plex-Token": token,
-                     "Accept": "application/json"},
+            f"https://plex.tv/api/v2/user?X-Plex-Token={token}",
+            headers={"Accept": "application/json"},
             timeout=10
         )
 
         print(f"[test-token] Response status: {response.status_code}")
         print(f"[test-token] Response headers: {dict(response.headers)}")
         print(f"[test-token] Response text (first 200 chars): {response.text[:200]}")
+        print(f"[test-token] Response length: {len(response.text)} chars")
 
         if response.status_code == 200:
             try:
-                # Check if response is JSON
-                content_type = response.headers.get('Content-Type', '')
-                if 'application/json' not in content_type:
-                    print(f"[test-token] WARNING: Response is not JSON, Content-Type: {content_type}")
+                # Check if response is empty
+                if not response.text or len(response.text.strip()) == 0:
+                    print(f"[test-token] ERROR: Empty response from Plex API")
                     return jsonify({
                         "success": False,
-                        "error": f"Unexpected response format (Content-Type: {content_type})"
+                        "error": "Plex API returned empty response. Token may be invalid or Plex servers may be down."
                     }), 500
+
+                # Check if response is JSON
+                content_type = response.headers.get('Content-Type', '')
+                if 'application/json' not in content_type and 'application/xml' not in content_type:
+                    print(f"[test-token] WARNING: Unexpected content type: {content_type}")
+                    # Try to parse as JSON anyway (Plex sometimes returns wrong content-type)
 
                 user_data = response.json()
                 username = user_data.get("username", user_data.get("title", "Unknown"))
-                print(f"[test-token] Token valid for user: {username}")
+                print(f"[test-token] ✓ Token valid for user: {username}")
 
                 return jsonify({
                     "success": True,
@@ -195,9 +201,10 @@ def test_plex_token():
                 })
             except ValueError as json_error:
                 print(f"[test-token] JSON parsing error: {json_error}")
+                print(f"[test-token] Response was: {response.text[:500]}")
                 return jsonify({
                     "success": False,
-                    "error": f"Failed to parse response: {str(json_error)}"
+                    "error": f"Token validation failed: Plex returned invalid response. The token may be incorrect or expired."
                 }), 500
         else:
             print(f"[test-token] Invalid token, status: {response.status_code}")
