@@ -17,6 +17,8 @@ function App() {
   const [showOperations, setShowOperations] = useState(false);
   const [scanProgress, setScanProgress] = useState(null);
   const [scanLimit, setScanLimit] = useState(null); // null = scan all
+  const [offset, setOffset] = useState(0); // Current offset for pagination
+  const [totalCount, setTotalCount] = useState(0); // Total items in library
 
   const loadLibraries = useCallback(async () => {
     try {
@@ -74,6 +76,7 @@ function App() {
     if (!selectedLibrary) return;
 
     setLoading(true);
+    setOffset(0); // Reset offset for fresh scan
     setScanProgress({ scanning: true, current: 0, total: 0, current_item: '' });
 
     // Start polling for progress
@@ -91,9 +94,11 @@ function App() {
     }, 500); // Poll every 500ms
 
     try {
-      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit);
+      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit, 0);
       setItems(response.data.items);
       setStats(response.data.stats);
+      setTotalCount(response.data.stats.total_count || 0);
+      setOffset(scanLimit || 0); // Set offset to limit for next load
       clearInterval(progressInterval);
       setScanProgress(null);
     } catch (error) {
@@ -119,6 +124,43 @@ function App() {
     } catch (error) {
       console.error('Error searching:', error);
       alert('Error searching: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!selectedLibrary || !scanLimit) return;
+
+    setLoading(true);
+    setScanProgress({ scanning: true, current: 0, total: 0, current_item: '' });
+
+    // Start polling for progress
+    const progressInterval = setInterval(async () => {
+      try {
+        const progressResponse = await libraryAPI.getScanProgress();
+        setScanProgress(progressResponse.data);
+
+        if (!progressResponse.data.scanning) {
+          clearInterval(progressInterval);
+        }
+      } catch (error) {
+        console.error('Error fetching progress:', error);
+      }
+    }, 500); // Poll every 500ms
+
+    try {
+      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit, offset);
+      setItems((prevItems) => [...prevItems, ...response.data.items]); // Append new items
+      setStats(response.data.stats);
+      setOffset((prevOffset) => prevOffset + scanLimit); // Update offset for next load
+      clearInterval(progressInterval);
+      setScanProgress(null);
+    } catch (error) {
+      console.error('Error loading more:', error);
+      alert('Error loading more: ' + error.message);
+      clearInterval(progressInterval);
+      setScanProgress(null);
     } finally {
       setLoading(false);
     }
@@ -401,16 +443,41 @@ function App() {
               )}
             </div>
           ) : items.length > 0 ? (
-            items.map((item, index) => (
-              <ItemCard
-                key={index}
-                item={item}
-                selectedArtwork={selectedArtwork}
-                onSelectArtwork={handleSelectArtwork}
-                onDeleteArtwork={handleDeleteArtwork}
-                thumbnailSize={config?.thumbnail_size?.[0] || 300}
-              />
-            ))
+            <>
+              {/* Pagination Info */}
+              {totalCount > 0 && scanLimit && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+                  <div className="text-center text-blue-800 font-medium">
+                    Showing {items.length} of {totalCount} items in library
+                    {offset < totalCount && ` (${Math.ceil((totalCount - offset) / scanLimit)} more page${Math.ceil((totalCount - offset) / scanLimit) === 1 ? '' : 's'} available)`}
+                  </div>
+                </div>
+              )}
+
+              {items.map((item, index) => (
+                <ItemCard
+                  key={index}
+                  item={item}
+                  selectedArtwork={selectedArtwork}
+                  onSelectArtwork={handleSelectArtwork}
+                  onDeleteArtwork={handleDeleteArtwork}
+                  thumbnailSize={config?.thumbnail_size?.[0] || 300}
+                />
+              ))}
+
+              {/* Load More Button */}
+              {scanLimit && offset < totalCount && (
+                <div className="bg-white rounded-lg shadow-md p-6 text-center">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loading}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium"
+                  >
+                    {loading ? '⏳ Loading...' : `📥 Load More (${Math.min(scanLimit, totalCount - offset)} more items)`}
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="bg-white rounded-lg shadow-md p-12 text-center">
               <div className="text-gray-500 text-lg mb-4">

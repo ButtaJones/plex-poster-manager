@@ -98,7 +98,7 @@ class PlexScannerAPI:
             print(f"[get_libraries] ERROR: {e}")
             return []
 
-    def scan_library(self, library_name: str, progress_callback=None, limit: int = None) -> List[Dict]:
+    def scan_library(self, library_name: str, progress_callback=None, limit: int = None, offset: int = 0) -> Dict:
         """
         Scan a library for shows/movies and their artwork.
 
@@ -106,9 +106,10 @@ class PlexScannerAPI:
             library_name: Name of library to scan (e.g., 'TV Shows', 'Movies')
             progress_callback: Optional callback function(current, total, item_name)
             limit: Optional limit on number of items to scan (None = scan all)
+            offset: Starting position for pagination (default 0)
 
         Returns:
-            List of items with artwork metadata
+            Dict with 'items' (list of items with artwork) and 'total_count' (total items in library)
         """
         if not self.plex:
             if not self.connect():
@@ -125,12 +126,13 @@ class PlexScannerAPI:
             all_content = library.all()
             total_items = len(all_content)
 
-            # Apply limit if specified
+            # Apply offset and limit for pagination
             if limit and limit > 0:
-                all_content = all_content[:limit]
-                print(f"[scan_library] Found {total_items} items in library (limiting to {limit})")
+                end_pos = offset + limit
+                all_content = all_content[offset:end_pos]
+                print(f"[scan_library] Found {total_items} items in library (showing {offset+1}-{min(end_pos, total_items)})")
             else:
-                print(f"[scan_library] Found {total_items} items in library")
+                print(f"[scan_library] Found {total_items} items in library (scanning all)")
 
             for idx, content in enumerate(all_content):
                 if idx < 5:  # Detailed logging for first 5 items
@@ -155,16 +157,19 @@ class PlexScannerAPI:
             print(f"[scan_library] Total items with artwork: {len(items)}")
             print(f"[scan_library] Total artwork files: {sum(item['total_artwork'] for item in items)}")
 
-            return items
+            return {
+                'items': items,
+                'total_count': total_items
+            }
 
         except NotFound:
             print(f"[scan_library] ERROR: Library '{library_name}' not found")
-            return []
+            return {'items': [], 'total_count': 0}
         except Exception as e:
             print(f"[scan_library] ERROR: {e}")
             import traceback
             traceback.print_exc()
-            return []
+            return {'items': [], 'total_count': 0}
 
     def _build_thumb_url(self, thumb_path: str) -> str:
         """

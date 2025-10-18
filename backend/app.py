@@ -275,9 +275,10 @@ def scan_library():
     data = request.json
     library = data.get('library', 'TV Shows')
     limit = data.get('limit', None)  # None = scan all
+    offset = data.get('offset', 0)  # Start position for pagination
 
     if limit:
-        print(f"\n[API /api/scan] Scanning library: {library} (limit: {limit} items)")
+        print(f"\n[API /api/scan] Scanning library: {library} (limit: {limit} items, offset: {offset})")
     else:
         print(f"\n[API /api/scan] Scanning library: {library} (all items)")
 
@@ -301,16 +302,17 @@ def scan_library():
         })
 
     try:
-        items = scanner.scan_library(library, progress_callback=progress_callback, limit=limit)
+        result = scanner.scan_library(library, progress_callback=progress_callback, limit=limit, offset=offset)
 
         # Mark scanning complete
         scan_progress["scanning"] = False
 
-        # Add statistics
-        total_items = len(items)
+        # Extract items and total count from result
+        items = result['items']
+        total_count = result['total_count']
         total_artwork = sum(item['total_artwork'] for item in items)
 
-        print(f"[API /api/scan] Scan completed. Items: {total_items}, Artwork: {total_artwork}")
+        print(f"[API /api/scan] Scan completed. Items returned: {len(items)}, Total in library: {total_count}, Artwork: {total_artwork}")
 
         # Build response
         response = {
@@ -318,13 +320,16 @@ def scan_library():
             "library": library,
             "items": items,
             "stats": {
-                "total_items": total_items,
-                "total_artwork": total_artwork
+                "total_items": len(items),
+                "total_artwork": total_artwork,
+                "total_count": total_count,  # Total items in library (for pagination)
+                "offset": offset,
+                "limit": limit
             }
         }
 
         # Add helpful message if no results
-        if total_items == 0:
+        if len(items) == 0:
             response["warning"] = (
                 "No items with artwork found. Please check:\n"
                 "1. The Plex server is running and accessible\n"
