@@ -56,6 +56,10 @@ class PlexPosterManagerLauncher:
         # Check dependencies
         self.root.after(100, self.check_dependencies)
 
+        # Auto-start if configured
+        if self.config.get("auto_start_servers", False):
+            self.root.after(2000, self.auto_start)
+
     def load_config(self):
         """Load configuration from file."""
         if CONFIG_FILE.exists():
@@ -74,7 +78,8 @@ class PlexPosterManagerLauncher:
             "plex_token": "",
             "backup_directory": str(PROJECT_ROOT / "backups"),
             "thumbnail_size": [300, 450],
-            "auto_detect_url": True
+            "auto_detect_url": True,
+            "auto_start_servers": False
         }
 
     def save_config(self):
@@ -165,9 +170,14 @@ class PlexPosterManagerLauncher:
         token_link.pack(side="left", padx=5)
         token_link.bind("<Button-1>", lambda e: webbrowser.open("https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/"))
 
+        # Auto-start checkbox
+        self.auto_start_var = tk.BooleanVar(value=self.config.get("auto_start_servers", False))
+        ttk.Checkbutton(config_frame, text="🚀 Auto-start servers on launch",
+                       variable=self.auto_start_var).grid(row=5, column=0, sticky="w", pady=5)
+
         # Save Config Button
         ttk.Button(config_frame, text="💾 Save Configuration",
-                   command=self.save_configuration).grid(row=5, column=0, pady=5)
+                   command=self.save_configuration).grid(row=6, column=0, pady=5)
 
         # --- Control Section ---
         control_frame = ttk.Frame(main_frame)
@@ -248,7 +258,7 @@ class PlexPosterManagerLauncher:
             self.token_entry.config(show="*")
 
     def test_token(self):
-        """Test Plex token validity."""
+        """Test Plex token validity using PlexAPI."""
         token = self.token_var.get().strip()
         if not token:
             messagebox.showwarning("No Token", "Please enter a Plex token to test.")
@@ -257,26 +267,40 @@ class PlexPosterManagerLauncher:
         self.log("Testing Plex token...")
 
         try:
-            response = requests.get("https://plex.tv/api/v2/user",
-                                    headers={"X-Plex-Token": token},
-                                    timeout=10)
+            # Test by trying to connect to Plex server
+            from plexapi.server import PlexServer
 
-            if response.status_code == 200:
-                user_data = response.json()
-                username = user_data.get("username", "Unknown")
-                self.log(f"✓ Token valid! Logged in as: {username}")
-                messagebox.showinfo("Success", f"Token is valid!\nLogged in as: {username}")
-            else:
-                self.log(f"✗ Invalid token (Status: {response.status_code})")
-                messagebox.showerror("Error", "Invalid Plex token.")
+            plex_url = self.url_var.get().strip() or "http://localhost:32400"
+            plex = PlexServer(plex_url, token)
+
+            # If we got here, connection worked!
+            self.log(f"✓ Token valid! Connected to: {plex.friendlyName}")
+            self.log(f"  Server version: {plex.version}")
+            messagebox.showinfo("Success",
+                              f"Token is valid!\n\n"
+                              f"Connected to: {plex.friendlyName}\n"
+                              f"Version: {plex.version}")
         except Exception as e:
-            self.log(f"✗ Error testing token: {e}")
-            messagebox.showerror("Error", f"Failed to test token:\n{e}")
+            error_msg = str(e)
+            self.log(f"✗ Token test failed: {error_msg}")
+
+            if "401" in error_msg or "Unauthorized" in error_msg:
+                messagebox.showerror("Invalid Token",
+                                    "Token is invalid or expired.\n\n"
+                                    "Please get a new token from:\n"
+                                    "https://support.plex.tv/articles/204059436")
+            elif "Connection" in error_msg or "timeout" in error_msg.lower():
+                messagebox.showerror("Connection Failed",
+                                    f"Could not connect to Plex server at:\n{plex_url}\n\n"
+                                    "Make sure Plex Media Server is running.")
+            else:
+                messagebox.showerror("Error", f"Token test failed:\n\n{error_msg}")
 
     def save_configuration(self):
         """Save current configuration."""
         self.config["plex_url"] = self.url_var.get().strip()
         self.config["plex_token"] = self.token_var.get().strip()
+        self.config["auto_start_servers"] = self.auto_start_var.get()
 
         # Validate token is provided
         if not self.config["plex_token"]:
@@ -554,6 +578,12 @@ class PlexPosterManagerLauncher:
         """Open the app in default browser."""
         webbrowser.open("http://localhost:3000")
         self.log("✓ Opened browser to http://localhost:3000")
+
+    def auto_start(self):
+        """Auto-start servers if configured and dependencies are ready."""
+        if self.check_dependencies():
+            self.log("\n🚀 Auto-starting servers (configured in settings)...\n")
+            self.start_servers()
 
     def on_closing(self):
         """Handle window closing."""
