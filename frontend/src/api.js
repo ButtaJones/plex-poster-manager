@@ -17,7 +17,7 @@ export const configAPI = {
 
 export const libraryAPI = {
   getLibraries: () => api.get('/libraries'),
-  scanLibrary: (library) => api.post('/scan', { library }),
+  scanLibrary: (library, limit = null) => api.post('/scan', { library, limit }),
   getScanProgress: () => api.get('/scan-progress'),
   searchItems: (query, library) => api.post('/search', { query, library }),
 };

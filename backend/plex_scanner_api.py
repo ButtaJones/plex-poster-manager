@@ -98,13 +98,14 @@ class PlexScannerAPI:
             print(f"[get_libraries] ERROR: {e}")
             return []
 
-    def scan_library(self, library_name: str, progress_callback=None) -> List[Dict]:
+    def scan_library(self, library_name: str, progress_callback=None, limit: int = None) -> List[Dict]:
         """
         Scan a library for shows/movies and their artwork.
 
         Args:
             library_name: Name of library to scan (e.g., 'TV Shows', 'Movies')
             progress_callback: Optional callback function(current, total, item_name)
+            limit: Optional limit on number of items to scan (None = scan all)
 
         Returns:
             List of items with artwork metadata
@@ -123,7 +124,13 @@ class PlexScannerAPI:
             items = []
             all_content = library.all()
             total_items = len(all_content)
-            print(f"[scan_library] Found {total_items} items in library")
+
+            # Apply limit if specified
+            if limit and limit > 0:
+                all_content = all_content[:limit]
+                print(f"[scan_library] Found {total_items} items in library (limiting to {limit})")
+            else:
+                print(f"[scan_library] Found {total_items} items in library")
 
             for idx, content in enumerate(all_content):
                 if idx < 5:  # Detailed logging for first 5 items

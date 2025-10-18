@@ -274,8 +274,12 @@ def scan_library():
 
     data = request.json
     library = data.get('library', 'TV Shows')
+    limit = data.get('limit', None)  # None = scan all
 
-    print(f"\n[API /api/scan] Scanning library: {library}")
+    if limit:
+        print(f"\n[API /api/scan] Scanning library: {library} (limit: {limit} items)")
+    else:
+        print(f"\n[API /api/scan] Scanning library: {library} (all items)")
 
     # Initialize progress
     scan_progress = {
@@ -297,7 +301,7 @@ def scan_library():
         })
 
     try:
-        items = scanner.scan_library(library, progress_callback=progress_callback)
+        items = scanner.scan_library(library, progress_callback=progress_callback, limit=limit)
 
         # Mark scanning complete
         scan_progress["scanning"] = False

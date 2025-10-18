@@ -16,6 +16,7 @@ function App() {
   const [operations, setOperations] = useState([]);
   const [showOperations, setShowOperations] = useState(false);
   const [scanProgress, setScanProgress] = useState(null);
+  const [scanLimit, setScanLimit] = useState(null); // null = scan all
 
   const loadLibraries = useCallback(async () => {
     try {
@@ -90,7 +91,7 @@ function App() {
     }, 500); // Poll every 500ms
 
     try {
-      const response = await libraryAPI.scanLibrary(selectedLibrary);
+      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit);
       setItems(response.data.items);
       setStats(response.data.stats);
       clearInterval(progressInterval);
@@ -203,7 +204,7 @@ function App() {
       <main className="container mx-auto px-4 py-8">
         {/* Controls */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {/* Library Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -224,6 +225,24 @@ function App() {
                     </option>
                   ))
                 )}
+              </select>
+            </div>
+
+            {/* Scan Limit */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Scan Limit
+              </label>
+              <select
+                value={scanLimit || ''}
+                onChange={(e) => setScanLimit(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Items</option>
+                <option value="100">100 items</option>
+                <option value="500">500 items</option>
+                <option value="1000">1000 items</option>
+                <option value="2000">2000 items</option>
               </select>
             </div>
 
