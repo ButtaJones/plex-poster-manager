@@ -13,7 +13,7 @@ import json
 from PIL import Image
 import requests
 
-from plex_scanner import PlexScanner, detect_plex_path
+from plex_scanner_api import PlexScannerAPI, detect_plex_url
 from file_manager import FileManager
 
 app = Flask(__name__)
@@ -37,11 +37,11 @@ def load_config():
     else:
         # Default config
         config = {
-            "plex_metadata_path": detect_plex_path() or "",
+            "plex_url": detect_plex_url() or "http://localhost:32400",
             "plex_token": "",
             "backup_directory": str(Path(__file__).parent.parent / "backups"),
             "thumbnail_size": [300, 450],
-            "auto_detect_path": True
+            "auto_detect_url": True
         }
         save_config()
 
@@ -81,16 +81,26 @@ def update_config():
         save_config()
         print(f"[API /api/config POST] Configuration saved")
 
-        # Reinitialize scanner if path changed
-        if 'plex_metadata_path' in data and data['plex_metadata_path']:
-            print(f"[API /api/config POST] Initializing scanner with path: {data['plex_metadata_path']}")
-            scanner = PlexScanner(data['plex_metadata_path'])
+        # Reinitialize scanner if URL or token changed
+        if 'plex_url' in data or 'plex_token' in data:
+            plex_url = config.get('plex_url', 'http://localhost:32400')
+            plex_token = config.get('plex_token', '')
 
-            if not scanner.validate_path():
-                print(f"[API /api/config POST] WARNING: Path validation failed")
+            if not plex_token:
+                print(f"[API /api/config POST] WARNING: No Plex token provided")
                 return jsonify({
                     "success": False,
-                    "error": "Invalid Plex metadata path - path does not exist or is not a valid Plex directory"
+                    "error": "Plex token is REQUIRED for API-based scanning. Please provide a valid token."
+                }), 400
+
+            print(f"[API /api/config POST] Initializing API scanner with URL: {plex_url}")
+            scanner = PlexScannerAPI(plex_url, plex_token)
+
+            if not scanner.connect():
+                print(f"[API /api/config POST] WARNING: Connection to Plex failed")
+                return jsonify({
+                    "success": False,
+                    "error": "Could not connect to Plex server. Check URL and token."
                 }), 400
 
             print(f"[API /api/config POST] Scanner initialized successfully")
@@ -108,33 +118,33 @@ def update_config():
         }), 500
 
 
-@app.route('/api/detect-path', methods=['GET'])
-def auto_detect_path():
-    """Auto-detect Plex metadata path."""
-    print("\n[API /api/detect-path] Auto-detecting Plex metadata path...")
+@app.route('/api/detect-url', methods=['GET'])
+def auto_detect_url():
+    """Auto-detect Plex server URL."""
+    print("\n[API /api/detect-url] Auto-detecting Plex server URL...")
 
     try:
-        detected_path = detect_plex_path()
+        detected_url = detect_plex_url()
 
-        if detected_path:
-            print(f"[API /api/detect-path] Found path: {detected_path}")
+        if detected_url:
+            print(f"[API /api/detect-url] Found URL: {detected_url}")
             return jsonify({
                 "success": True,
-                "path": detected_path
+                "url": detected_url
             })
         else:
-            print(f"[API /api/detect-path] No path found")
+            print(f"[API /api/detect-url] No URL found")
             return jsonify({
                 "success": False,
-                "error": "Could not auto-detect Plex path"
+                "error": "Could not auto-detect Plex server"
             }), 404
     except Exception as e:
-        print(f"[API /api/detect-path] ERROR: {e}")
+        print(f"[API /api/detect-url] ERROR: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
             "success": False,
-            "error": f"Error during path detection: {str(e)}"
+            "error": f"Error during URL detection: {str(e)}"
         }), 500
 
 
@@ -228,8 +238,8 @@ def test_plex_token():
 def get_libraries():
     """Get list of available Plex libraries."""
     if not scanner:
-        return jsonify({"error": "Plex path not configured"}), 400
-    
+        return jsonify({"error": "Plex scanner not initialized. Please configure URL and token."}), 400
+
     libraries = scanner.get_libraries()
     return jsonify({"libraries": libraries})
 
@@ -240,7 +250,7 @@ def scan_library():
     if not scanner:
         return jsonify({
             "success": False,
-            "error": "Plex path not configured"
+            "error": "Plex scanner not initialized. Please configure URL and token."
         }), 400
 
     data = request.json
@@ -257,7 +267,7 @@ def scan_library():
 
         print(f"[API /api/scan] Scan completed. Items: {total_items}, Artwork: {total_artwork}")
 
-        # Build response with helpful message if empty
+        # Build response
         response = {
             "success": True,
             "library": library,
@@ -272,10 +282,10 @@ def scan_library():
         if total_items == 0:
             response["warning"] = (
                 "No items with artwork found. Please check:\n"
-                "1. The path contains Plex metadata (.bundle folders)\n"
-                "2. The path is correct and accessible\n"
-                f"3. The '{library}' library exists at this location\n"
-                "4. The metadata folders contain artwork files"
+                "1. The Plex server is running and accessible\n"
+                "2. The Plex token is valid\n"
+                f"3. The '{library}' library exists and contains media\n"
+                "4. The library items have artwork assigned"
             )
             print(f"[API /api/scan] WARNING: No items found!")
 
@@ -293,18 +303,23 @@ def scan_library():
 
 @app.route('/api/thumbnail', methods=['GET'])
 def get_thumbnail():
-    """Generate and serve a thumbnail for an artwork file."""
-    file_path = request.args.get('path')
+    """Fetch and serve a thumbnail from Plex API."""
+    thumb_url = request.args.get('url')
     size = config.get('thumbnail_size', [300, 450])
-    
-    if not file_path or not Path(file_path).exists():
-        return jsonify({"error": "File not found"}), 404
-    
+
+    if not thumb_url:
+        return jsonify({"error": "No thumbnail URL provided"}), 400
+
     try:
+        # Fetch image from Plex
+        response = requests.get(thumb_url, timeout=10)
+        if response.status_code != 200:
+            return jsonify({"error": "Failed to fetch thumbnail from Plex"}), 404
+
         # Open and resize image
-        img = Image.open(file_path)
+        img = Image.open(io.BytesIO(response.content))
         img.thumbnail(size, Image.Resampling.LANCZOS)
-        
+
         # Convert to RGB if necessary (for PNG with transparency)
         if img.mode in ('RGBA', 'LA', 'P'):
             background = Image.new('RGB', img.size, (255, 255, 255))
@@ -312,15 +327,16 @@ def get_thumbnail():
                 img = img.convert('RGBA')
             background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
             img = background
-        
+
         # Save to bytes
         img_io = io.BytesIO()
         img.save(img_io, 'JPEG', quality=85)
         img_io.seek(0)
 
         return send_file(img_io, mimetype='image/jpeg')
-    
+
     except Exception as e:
+        print(f"[thumbnail] ERROR: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -384,27 +400,27 @@ def clean_old_backups():
 def search_items():
     """Search for items by title."""
     if not scanner:
-        return jsonify({"error": "Plex path not configured"}), 400
-    
+        return jsonify({"error": "Plex scanner not initialized"}), 400
+
     data = request.json
     query = data.get('query', '').lower()
     library = data.get('library', 'TV Shows')
-    
+
     try:
         all_items = scanner.scan_library(library)
-        
+
         # Filter by search query
         filtered_items = [
             item for item in all_items
-            if query in item['info']['title'].lower()
+            if query in item['title'].lower()
         ]
-        
+
         return jsonify({
             "success": True,
             "items": filtered_items,
             "total": len(filtered_items)
         })
-    
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -414,28 +430,13 @@ def search_items():
 
 @app.route('/api/duplicates', methods=['POST'])
 def find_duplicates():
-    """Find duplicate artwork files."""
-    if not scanner:
-        return jsonify({"error": "Plex path not configured"}), 400
-    
-    data = request.json
-    library = data.get('library', 'TV Shows')
-    
-    try:
-        all_items = scanner.scan_library(library)
-        duplicates = scanner.find_duplicates(all_items)
-        
-        return jsonify({
-            "success": True,
-            "duplicates": duplicates,
-            "count": len(duplicates)
-        })
-    
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    """Find duplicate artwork files (TODO: implement for API scanner)."""
+    return jsonify({
+        "success": True,
+        "duplicates": [],
+        "count": 0,
+        "message": "Duplicate detection not yet implemented for API scanner"
+    })
 
 
 @app.route('/api/health', methods=['GET'])
@@ -452,19 +453,27 @@ def initialize():
     """Initialize the application."""
     global scanner
     load_config()
-    
-    # Initialize scanner if path is configured
-    if config.get('plex_metadata_path'):
-        scanner = PlexScanner(config['plex_metadata_path'])
+
+    # Initialize scanner if URL and token are configured
+    plex_url = config.get('plex_url')
+    plex_token = config.get('plex_token')
+
+    if plex_url and plex_token:
+        print(f"\n[initialize] Initializing Plex API scanner...")
+        scanner = PlexScannerAPI(plex_url, plex_token)
+        scanner.connect()
+    else:
+        print(f"\n[initialize] No Plex URL/token configured. Scanner not initialized.")
 
 
 if __name__ == '__main__':
     initialize()
     print("=" * 60)
-    print("Plex Poster Manager API Server")
+    print("Plex Poster Manager API Server (v2.0.0 - Plex API)")
     print("=" * 60)
     print(f"Server running on http://localhost:5000")
-    print(f"Plex path: {config.get('plex_metadata_path', 'Not configured')}")
+    print(f"Plex URL: {config.get('plex_url', 'Not configured')}")
+    print(f"Plex Token: {'Configured' if config.get('plex_token') else 'Not configured'}")
     print(f"Backup directory: {config.get('backup_directory')}")
     print("=" * 60)
     app.run(debug=True, host='0.0.0.0', port=5000)

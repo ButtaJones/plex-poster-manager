@@ -1,0 +1,318 @@
+"""
+Plex Scanner using Official Plex API (v2.0.0)
+Professional approach using python-plexapi library.
+Based on how Kometa and Tautulli handle Plex artwork.
+"""
+
+from plexapi.server import PlexServer
+from plexapi.exceptions import BadRequest, NotFound, Unauthorized
+from pathlib import Path
+from typing import List, Dict, Optional
+import hashlib
+
+
+class PlexScannerAPI:
+    """
+    Plex artwork scanner using the official Plex API.
+
+    This is the CORRECT way to manage Plex artwork, as used by:
+    - Kometa (Plex Meta Manager)
+    - Tautulli
+    - Other professional Plex tools
+
+    Advantages over filesystem scanning:
+    - Always works (no folder structure changes break it)
+    - Gets real titles from Plex metadata
+    - Shows which artwork is selected
+    - Can trigger Plex refreshes
+    - Future-proof (Plex API is stable)
+    """
+
+    def __init__(self, plex_url: str, plex_token: str):
+        """
+        Initialize Plex API scanner.
+
+        Args:
+            plex_url: Plex server URL (e.g., 'http://localhost:32400')
+            plex_token: Plex authentication token (REQUIRED)
+        """
+        self.plex_url = plex_url.rstrip('/')
+        self.plex_token = plex_token
+        self.plex = None
+
+        print(f"\n[PlexScannerAPI] Initializing with Plex API")
+        print(f"[PlexScannerAPI] URL: {plex_url}")
+        print(f"[PlexScannerAPI] Token: {plex_token[:10]}..." if plex_token else "[PlexScannerAPI] Token: None")
+
+    def connect(self) -> bool:
+        """
+        Connect to Plex server and verify authentication.
+
+        Returns:
+            True if connection successful, False otherwise
+        """
+        try:
+            print(f"\n[PlexScannerAPI] Connecting to Plex server...")
+            self.plex = PlexServer(self.plex_url, self.plex_token)
+
+            # Verify connection by getting server identity
+            print(f"[PlexScannerAPI] Connected to: {self.plex.friendlyName}")
+            print(f"[PlexScannerAPI] Version: {self.plex.version}")
+            print(f"[PlexScannerAPI] Platform: {self.plex.platform}")
+            return True
+
+        except Unauthorized:
+            print(f"[PlexScannerAPI] ERROR: Invalid Plex token")
+            return False
+        except Exception as e:
+            print(f"[PlexScannerAPI] ERROR: Connection failed - {e}")
+            return False
+
+    def get_libraries(self) -> List[str]:
+        """
+        Get list of available library names.
+
+        Returns:
+            List of library section names
+        """
+        if not self.plex:
+            if not self.connect():
+                return []
+
+        try:
+            libraries = [section.title for section in self.plex.library.sections()]
+            print(f"\n[get_libraries] Found {len(libraries)} libraries: {libraries}")
+            return libraries
+        except Exception as e:
+            print(f"[get_libraries] ERROR: {e}")
+            return []
+
+    def scan_library(self, library_name: str) -> List[Dict]:
+        """
+        Scan a library for shows/movies and their artwork.
+
+        Args:
+            library_name: Name of library to scan (e.g., 'TV Shows', 'Movies')
+
+        Returns:
+            List of items with artwork metadata
+        """
+        if not self.plex:
+            if not self.connect():
+                return []
+
+        print(f"\n[scan_library] Scanning library: '{library_name}'")
+        print(f"[scan_library] Using Plex API (professional approach)")
+
+        try:
+            library = self.plex.library.section(library_name)
+            print(f"[scan_library] Library type: {library.type}")
+
+            items = []
+            all_content = library.all()
+            print(f"[scan_library] Found {len(all_content)} items in library")
+
+            for idx, content in enumerate(all_content):
+                if idx < 5:  # Detailed logging for first 5 items
+                    print(f"\n[scan_library] Processing item {idx + 1}: {content.title}")
+                elif idx == 5:
+                    print(f"\n[scan_library] Processing remaining items (summary mode)...")
+
+                try:
+                    item_data = self._get_item_artwork(content, detailed=idx < 5)
+                    if item_data['total_artwork'] > 0:
+                        items.append(item_data)
+                except Exception as e:
+                    if idx < 5:
+                        print(f"[scan_library] ERROR processing {content.title}: {e}")
+                    continue
+
+            print(f"\n[scan_library] Scan complete!")
+            print(f"[scan_library] Total items with artwork: {len(items)}")
+            print(f"[scan_library] Total artwork files: {sum(item['total_artwork'] for item in items)}")
+
+            return items
+
+        except NotFound:
+            print(f"[scan_library] ERROR: Library '{library_name}' not found")
+            return []
+        except Exception as e:
+            print(f"[scan_library] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def _get_item_artwork(self, item, detailed: bool = False) -> Dict:
+        """
+        Get all artwork for a single item (show/movie).
+
+        Args:
+            item: PlexAPI item object
+            detailed: Whether to print detailed logs
+
+        Returns:
+            Dictionary with item metadata and artwork
+        """
+        artwork_data = {
+            "posters": [],
+            "art": [],  # Background artwork
+            "banners": [],
+            "themes": []
+        }
+
+        # Get available posters
+        try:
+            posters = item.posters()
+            if detailed:
+                print(f"  [artwork] Found {len(posters)} posters")
+
+            for poster in posters:
+                artwork_data["posters"].append({
+                    "provider": poster.provider if hasattr(poster, 'provider') else "unknown",
+                    "selected": poster.selected if hasattr(poster, 'selected') else False,
+                    "thumb_url": f"{self.plex_url}{poster.thumb}?X-Plex-Token={self.plex_token}",
+                    "rating_key": poster.ratingKey if hasattr(poster, 'ratingKey') else None,
+                    "type": "poster"
+                })
+        except Exception as e:
+            if detailed:
+                print(f"  [artwork] No posters available: {e}")
+
+        # Get available art (backgrounds)
+        try:
+            arts = item.arts()
+            if detailed:
+                print(f"  [artwork] Found {len(arts)} background arts")
+
+            for art in arts:
+                artwork_data["art"].append({
+                    "provider": art.provider if hasattr(art, 'provider') else "unknown",
+                    "selected": art.selected if hasattr(art, 'selected') else False,
+                    "thumb_url": f"{self.plex_url}{art.thumb}?X-Plex-Token={self.plex_token}",
+                    "rating_key": art.ratingKey if hasattr(art, 'ratingKey') else None,
+                    "type": "background"
+                })
+        except Exception as e:
+            if detailed:
+                print(f"  [artwork] No background arts available: {e}")
+
+        # Get available banners (TV shows)
+        try:
+            banners = item.banners()
+            if detailed:
+                print(f"  [artwork] Found {len(banners)} banners")
+
+            for banner in banners:
+                artwork_data["banners"].append({
+                    "provider": banner.provider if hasattr(banner, 'provider') else "unknown",
+                    "selected": banner.selected if hasattr(banner, 'selected') else False,
+                    "thumb_url": f"{self.plex_url}{banner.thumb}?X-Plex-Token={self.plex_token}",
+                    "rating_key": banner.ratingKey if hasattr(banner, 'ratingKey') else None,
+                    "type": "banner"
+                })
+        except Exception as e:
+            if detailed:
+                print(f"  [artwork] No banners available: {e}")
+
+        # Get available themes
+        try:
+            themes = item.themes()
+            if detailed:
+                print(f"  [artwork] Found {len(themes)} themes")
+
+            for theme in themes:
+                artwork_data["themes"].append({
+                    "provider": theme.provider if hasattr(theme, 'provider') else "unknown",
+                    "selected": theme.selected if hasattr(theme, 'selected') else False,
+                    "thumb_url": f"{self.plex_url}{theme.thumb}?X-Plex-Token={self.plex_token}",
+                    "rating_key": theme.ratingKey if hasattr(theme, 'ratingKey') else None,
+                    "type": "theme"
+                })
+        except Exception as e:
+            if detailed:
+                print(f"  [artwork] No themes available: {e}")
+
+        # Calculate total artwork
+        total_artwork = (
+            len(artwork_data["posters"]) +
+            len(artwork_data["art"]) +
+            len(artwork_data["banners"]) +
+            len(artwork_data["themes"])
+        )
+
+        return {
+            "title": item.title,
+            "year": getattr(item, 'year', None),
+            "type": item.type,
+            "rating_key": item.ratingKey,
+            "guid": item.guid if hasattr(item, 'guid') else None,
+            "artwork": artwork_data,
+            "total_artwork": total_artwork
+        }
+
+    def delete_artwork(self, rating_key: str, artwork_type: str) -> bool:
+        """
+        Delete/unlock artwork for an item.
+
+        Note: Plex API doesn't directly delete artwork files from disk.
+        Instead, it can unlock artwork to allow Plex to re-fetch from agents.
+
+        Args:
+            rating_key: Plex rating key for the artwork
+            artwork_type: Type of artwork (poster, art, banner, theme)
+
+        Returns:
+            True if successful
+        """
+        # TODO: Implement artwork deletion/unlocking via Plex API
+        # This requires using the Plex API endpoint to unlock poster
+        print(f"[delete_artwork] Unlocking {artwork_type} with rating_key: {rating_key}")
+        return False
+
+    def refresh_metadata(self, rating_key: str) -> bool:
+        """
+        Trigger Plex to refresh metadata for an item.
+
+        Args:
+            rating_key: Plex rating key for the item
+
+        Returns:
+            True if successful
+        """
+        try:
+            item = self.plex.fetchItem(rating_key)
+            item.refresh()
+            print(f"[refresh_metadata] Triggered refresh for: {item.title}")
+            return True
+        except Exception as e:
+            print(f"[refresh_metadata] ERROR: {e}")
+            return False
+
+
+def detect_plex_url() -> Optional[str]:
+    """
+    Auto-detect local Plex server URL.
+
+    Returns:
+        Plex server URL or None
+    """
+    # Try common local URLs
+    common_urls = [
+        "http://localhost:32400",
+        "http://127.0.0.1:32400",
+        "http://0.0.0.0:32400"
+    ]
+
+    import requests
+
+    for url in common_urls:
+        try:
+            response = requests.get(f"{url}/identity", timeout=2)
+            if response.status_code == 200:
+                print(f"[detect_plex_url] Found Plex server at: {url}")
+                return url
+        except:
+            continue
+
+    print(f"[detect_plex_url] No local Plex server found")
+    return None
