@@ -70,11 +70,11 @@ class PlexPosterManagerLauncher:
     def get_default_config(self):
         """Get default configuration."""
         return {
-            "plex_metadata_path": "",
+            "plex_url": "http://localhost:32400",
             "plex_token": "",
             "backup_directory": str(PROJECT_ROOT / "backups"),
             "thumbnail_size": [300, 450],
-            "auto_detect_path": True
+            "auto_detect_url": True
         }
 
     def save_config(self):
@@ -115,27 +115,26 @@ class PlexPosterManagerLauncher:
         config_frame = ttk.LabelFrame(main_frame, text="Configuration", padding="10")
         config_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
 
-        # Plex Metadata Path
-        ttk.Label(config_frame, text="Plex Metadata Path:").grid(row=0, column=0, sticky="w", pady=5)
+        # Plex Server URL
+        ttk.Label(config_frame, text="Plex Server URL:").grid(row=0, column=0, sticky="w", pady=5)
 
-        path_frame = ttk.Frame(config_frame)
-        path_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+        url_frame = ttk.Frame(config_frame)
+        url_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         config_frame.grid_columnconfigure(0, weight=1)
 
-        self.path_var = tk.StringVar(value=self.config.get("plex_metadata_path", ""))
-        path_entry = ttk.Entry(path_frame, textvariable=self.path_var, width=50)
-        path_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.url_var = tk.StringVar(value=self.config.get("plex_url", "http://localhost:32400"))
+        url_entry = ttk.Entry(url_frame, textvariable=self.url_var, width=50)
+        url_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
-        ttk.Button(path_frame, text="Browse", command=self.browse_path).pack(side="left", padx=2)
-        ttk.Button(path_frame, text="Auto-Detect", command=self.auto_detect_path).pack(side="left")
+        ttk.Button(url_frame, text="Auto-Detect", command=self.auto_detect_url).pack(side="left")
 
-        # Plex Token (Optional)
+        # Plex Token (REQUIRED for v2.0)
         token_label_frame = ttk.Frame(config_frame)
         token_label_frame.grid(row=2, column=0, sticky="w", pady=5)
 
-        ttk.Label(token_label_frame, text="Plex Token (Optional):").pack(side="left")
-        ttk.Label(token_label_frame, text="ℹ️ Not required - app works without it",
-                  foreground="gray", font=("Helvetica", 9)).pack(side="left", padx=5)
+        ttk.Label(token_label_frame, text="Plex Token (REQUIRED):").pack(side="left")
+        ttk.Label(token_label_frame, text="⚠️ Required for v2.0 API mode",
+                  foreground="red", font=("Helvetica", 9, "bold")).pack(side="left", padx=5)
 
         token_frame = ttk.Frame(config_frame)
         token_frame.grid(row=3, column=0, sticky="ew", pady=(0, 5))
@@ -151,11 +150,20 @@ class PlexPosterManagerLauncher:
                         command=self.toggle_token_visibility).pack(side="left", padx=2)
         ttk.Button(token_frame, text="Test Token", command=self.test_token).pack(side="left")
 
-        # Token help text
-        token_help = ttk.Label(config_frame,
-                              text="Token enables: API verification, automatic library detection. Not needed for basic file scanning.",
-                              foreground="gray", font=("Helvetica", 8), wraplength=600)
-        token_help.grid(row=4, column=0, sticky="w", pady=(0, 10))
+        # Token help text with link
+        token_help_frame = ttk.Frame(config_frame)
+        token_help_frame.grid(row=4, column=0, sticky="w", pady=(0, 10))
+
+        token_help = ttk.Label(token_help_frame,
+                              text="How to get token:",
+                              foreground="gray", font=("Helvetica", 8))
+        token_help.pack(side="left")
+
+        token_link = ttk.Label(token_help_frame,
+                              text="https://support.plex.tv/articles/204059436",
+                              foreground="blue", font=("Helvetica", 8), cursor="hand2")
+        token_link.pack(side="left", padx=5)
+        token_link.bind("<Button-1>", lambda e: webbrowser.open("https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/"))
 
         # Save Config Button
         ttk.Button(config_frame, text="💾 Save Configuration",
@@ -205,39 +213,32 @@ class PlexPosterManagerLauncher:
         self.log_text.see(tk.END)
         self.root.update_idletasks()
 
-    def browse_path(self):
-        """Open folder browser dialog."""
-        path = filedialog.askdirectory(title="Select Plex Metadata Directory")
-        if path:
-            self.path_var.set(path)
+    def auto_detect_url(self):
+        """Auto-detect Plex server URL."""
+        self.log("Detecting Plex server...")
 
-    def auto_detect_path(self):
-        """Auto-detect Plex metadata path."""
-        self.log("Detecting Plex metadata path...")
+        # Try common local URLs
+        common_urls = [
+            "http://localhost:32400",
+            "http://127.0.0.1:32400"
+        ]
 
-        # Common paths by platform
-        if platform.system() == "Windows":
-            paths = [
-                Path(os.environ.get("LOCALAPPDATA", "")) / "Plex Media Server" / "Metadata" / "TV Shows",
-                Path("C:/Users") / os.environ.get("USERNAME", "") / "AppData" / "Local" / "Plex Media Server" / "Metadata" / "TV Shows"
-            ]
-        elif platform.system() == "Darwin":  # macOS
-            paths = [
-                Path.home() / "Library" / "Application Support" / "Plex Media Server" / "Metadata" / "TV Shows"
-            ]
-        else:  # Linux
-            paths = [
-                Path("/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Metadata/TV Shows")
-            ]
+        for url in common_urls:
+            try:
+                response = requests.get(f"{url}/identity", timeout=2)
+                if response.status_code == 200:
+                    self.url_var.set(url)
+                    self.log(f"✓ Found Plex server at: {url}")
+                    messagebox.showinfo("Success", f"Found Plex server at:\n{url}")
+                    return
+            except:
+                continue
 
-        for path in paths:
-            if path.exists():
-                self.path_var.set(str(path))
-                self.log(f"✓ Found Plex path: {path}")
-                return
-
-        self.log("✗ Could not auto-detect Plex path. Please browse manually.")
-        messagebox.showwarning("Auto-Detect", "Could not find Plex metadata path automatically.\nPlease select it manually.")
+        self.log("✗ Could not auto-detect Plex server.")
+        messagebox.showwarning("Auto-Detect",
+                              "Could not find Plex server automatically.\n\n"
+                              "Make sure Plex Media Server is running,\n"
+                              "then enter the URL manually (e.g., http://localhost:32400)")
 
     def toggle_token_visibility(self):
         """Toggle Plex token visibility."""
@@ -274,8 +275,16 @@ class PlexPosterManagerLauncher:
 
     def save_configuration(self):
         """Save current configuration."""
-        self.config["plex_metadata_path"] = self.path_var.get().strip()
+        self.config["plex_url"] = self.url_var.get().strip()
         self.config["plex_token"] = self.token_var.get().strip()
+
+        # Validate token is provided
+        if not self.config["plex_token"]:
+            messagebox.showwarning("Token Required",
+                                  "Plex token is REQUIRED for v2.0!\n\n"
+                                  "The app uses the Plex API and needs your token.\n\n"
+                                  "Click the blue link above to learn how to get it.")
+            return
 
         if self.save_config():
             messagebox.showinfo("Success", "Configuration saved successfully!")
