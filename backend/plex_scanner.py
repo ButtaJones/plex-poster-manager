@@ -21,13 +21,17 @@ class PlexScanner:
         self.metadata_path = Path(metadata_path)
         self.cache = {}
 
-        # Find Plex database (go up from Metadata/ to Plex Media Server root)
-        plex_root = self.metadata_path.parent.parent
+        # Find Plex database
+        # metadata_path is: C:\...\Plex Media Server\Metadata
+        # We need:          C:\...\Plex Media Server\Plug-in Support\Databases\...
+        # So go UP one level from Metadata/ to get Plex Media Server root
+        plex_root = self.metadata_path.parent  # FIXED: was .parent.parent (too far!)
         self.db_path = plex_root / "Plug-in Support" / "Databases" / "com.plexapp.plugins.library.db"
 
         print(f"[PlexScanner] Initialized with path: {self.metadata_path}")
         print(f"[PlexScanner] Path exists: {self.metadata_path.exists()}")
         print(f"[PlexScanner] Path is directory: {self.metadata_path.is_dir() if self.metadata_path.exists() else 'N/A'}")
+        print(f"[PlexScanner] Plex root: {plex_root}")
         print(f"[PlexScanner] Database path: {self.db_path}")
         print(f"[PlexScanner] Database exists: {self.db_path.exists()}")
 
