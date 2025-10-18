@@ -11,6 +11,16 @@ import json
 from io import BytesIO
 from PIL import Image
 import requests
+import sys
+import io
+
+# Force UTF-8 encoding for Windows console to support Unicode symbols
+if sys.platform == 'win32':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except Exception:
+        pass  # If it fails, continue without UTF-8 (fallback)
 
 from plex_scanner import PlexScanner, detect_plex_path
 from file_manager import FileManager

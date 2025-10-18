@@ -9,6 +9,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import json
 import hashlib
+import sys
+import io
+
+# Force UTF-8 encoding for Windows console to support Unicode symbols
+if sys.platform == 'win32':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except Exception:
+        pass  # If it fails, continue without UTF-8 (fallback)
 
 
 class PlexScanner:
