@@ -20,7 +20,15 @@ function App() {
   const loadLibraries = async () => {
     try {
       const response = await libraryAPI.getLibraries();
-      setLibraries(response.data.libraries);
+      const libs = response.data.libraries || [];
+      console.log('[Frontend] Loaded libraries:', libs);
+      setLibraries(libs);
+
+      // Set default library if not already set
+      if (libs.length > 0 && !selectedLibrary) {
+        setSelectedLibrary(libs[0]);
+        console.log('[Frontend] Set default library to:', libs[0]);
+      }
     } catch (error) {
       console.error('Error loading libraries:', error);
     }
@@ -199,18 +207,23 @@ function App() {
             {/* Library Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Library
+                Library {libraries.length > 0 && `(${libraries.length} available)`}
               </label>
               <select
                 value={selectedLibrary}
                 onChange={(e) => setSelectedLibrary(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={libraries.length === 0}
               >
-                {libraries.map((lib) => (
-                  <option key={lib} value={lib}>
-                    {lib}
-                  </option>
-                ))}
+                {libraries.length === 0 ? (
+                  <option value="">No libraries found</option>
+                ) : (
+                  libraries.map((lib) => (
+                    <option key={lib} value={lib}>
+                      {lib}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 

@@ -158,13 +158,13 @@ class PlexScannerAPI:
         Returns:
             Complete thumbnail URL with token
         """
-        # If it's already a full URL (starts with http:// or https://), use as-is
+        # If it's already a full URL (starts with http:// or https://)
         if thumb_path.startswith('http://') or thumb_path.startswith('https://'):
-            # Add token as query parameter
-            separator = '&' if '?' in thumb_path else '?'
-            return f"{thumb_path}{separator}X-Plex-Token={self.plex_token}"
+            # External URLs (Plex transcoder, TVDB, TMDB, etc.) - use as-is
+            # These are already authenticated or publicly accessible
+            return thumb_path
         else:
-            # It's a relative path, prepend server URL
+            # It's a relative path to local Plex server - prepend server URL and token
             return f"{self.plex_url}{thumb_path}?X-Plex-Token={self.plex_token}"
 
     def _get_item_artwork(self, item, detailed: bool = False) -> Dict:
