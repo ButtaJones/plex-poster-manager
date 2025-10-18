@@ -3,14 +3,6 @@ Flask API Server for Plex Poster Manager
 Provides REST endpoints for scanning, managing, and deleting Plex artwork.
 """
 
-from flask import Flask, jsonify, request, send_file
-from flask_cors import CORS
-from pathlib import Path
-import os
-import json
-from io import BytesIO
-from PIL import Image
-import requests
 import sys
 import io
 
@@ -21,6 +13,14 @@ if sys.platform == 'win32':
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
     except Exception:
         pass  # If it fails, continue without UTF-8 (fallback)
+
+from flask import Flask, jsonify, request, send_file
+from flask_cors import CORS
+from pathlib import Path
+import os
+import json
+from PIL import Image
+import requests
 
 from plex_scanner import PlexScanner, detect_plex_path
 from file_manager import FileManager
@@ -323,10 +323,10 @@ def get_thumbnail():
             img = background
         
         # Save to bytes
-        img_io = BytesIO()
+        img_io = io.BytesIO()
         img.save(img_io, 'JPEG', quality=85)
         img_io.seek(0)
-        
+
         return send_file(img_io, mimetype='image/jpeg')
     
     except Exception as e:
