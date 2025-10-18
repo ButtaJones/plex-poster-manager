@@ -35,6 +35,93 @@ class PlexScanner:
         print(f"[PlexScanner] Database path: {self.db_path}")
         print(f"[PlexScanner] Database exists: {self.db_path.exists()}")
 
+        # Debug database structure if it exists
+        if self.db_path.exists():
+            self.debug_database()
+
+    def debug_database(self):
+        """Inspect database structure and sample data to understand schema."""
+        print("\n" + "=" * 60)
+        print("[DEBUG] INSPECTING PLEX DATABASE")
+        print("=" * 60)
+
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+
+            # Get table schema
+            print("\n[DEBUG] metadata_items table schema:")
+            cursor.execute("PRAGMA table_info(metadata_items)")
+            columns = cursor.fetchall()
+            for col in columns:
+                col_id, name, col_type, notnull, default, pk = col
+                print(f"  [{col_id}] {name} ({col_type})")
+
+            # Get sample row to see actual data
+            print("\n[DEBUG] Sample row from metadata_items:")
+            cursor.execute("SELECT * FROM metadata_items LIMIT 1")
+            sample = cursor.fetchone()
+            if sample:
+                for i, col in enumerate(columns):
+                    value = sample[i]
+                    # Truncate long values
+                    if isinstance(value, str) and len(value) > 50:
+                        value = value[:50] + "..."
+                    print(f"  {col[1]}: {value}")
+
+            # Check if hash field exists and sample values
+            print("\n[DEBUG] Checking 'hash' field for TV shows:")
+            cursor.execute("""
+                SELECT hash, title, year
+                FROM metadata_items
+                WHERE metadata_type = 2
+                LIMIT 5
+            """)
+            results = cursor.fetchall()
+            if results:
+                print("[DEBUG] Sample TV show hashes:")
+                for hash_val, title, year in results:
+                    print(f"  {hash_val} → {title} ({year})")
+            else:
+                print("[DEBUG] No TV shows found with metadata_type = 2")
+
+            # Count items by type
+            print("\n[DEBUG] Item counts by metadata_type:")
+            cursor.execute("""
+                SELECT metadata_type, COUNT(*)
+                FROM metadata_items
+                GROUP BY metadata_type
+            """)
+            for meta_type, count in cursor.fetchall():
+                type_name = {1: "movie", 2: "show", 3: "season", 4: "episode"}.get(meta_type, f"type_{meta_type}")
+                print(f"  {type_name} ({meta_type}): {count}")
+
+            # Check actual bundle folder names
+            print("\n[DEBUG] Comparing with actual bundle folders:")
+            bundles = list(self.metadata_path.rglob("*.bundle"))[:3]
+            for bundle in bundles:
+                bundle_hash = bundle.name.replace('.bundle', '')
+                print(f"  Bundle folder: {bundle_hash[:20]}...")
+
+                # Try to find this hash in database
+                cursor.execute("""
+                    SELECT title FROM metadata_items WHERE hash = ?
+                """, (bundle_hash,))
+                result = cursor.fetchone()
+                if result:
+                    print(f"    ✓ FOUND in DB: {result[0]}")
+                else:
+                    print(f"    ✗ NOT FOUND in database")
+
+            conn.close()
+
+        except Exception as e:
+            print(f"[DEBUG] Error inspecting database: {e}")
+            import traceback
+            traceback.print_exc()
+
+        print("=" * 60 + "\n")
+
     def validate_path(self) -> bool:
         """Validate that the provided path exists and looks like a Plex metadata directory."""
         print(f"\n[validate_path] Checking path: {self.metadata_path}")
