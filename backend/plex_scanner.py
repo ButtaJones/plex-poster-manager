@@ -282,34 +282,46 @@ class PlexScanner:
         total = len(bundles)
         print(f"[scan_library] Found {total} bundles to process")
 
-        # Enable detailed logging for first 3 bundles only
+        # ALWAYS enable detailed logging for first 5 bundles to see what's wrong
         self.detailed_logging = True
 
         results = []
         bundles_without_info = 0
         bundles_without_artwork = 0
+        bundles_with_info_but_no_artwork = 0
 
         for idx, bundle_path in enumerate(bundles):
             if progress_callback:
                 progress_callback(idx + 1, total)
 
-            # Disable detailed logging after first 3 bundles
-            if idx >= 3:
+            # Keep detailed logging for first 5 bundles instead of 3
+            if idx >= 5:
                 self.detailed_logging = False
 
-            # Only print progress every 100 bundles after the first 3
-            if idx < 3 or idx % 100 == 0:
+            # Always print progress for first 5, then every 100
+            if idx < 5 or idx % 100 == 0:
                 print(f"\n[scan_library] Processing bundle {idx+1}/{total}: {bundle_path.name}")
 
             # Parse metadata
             info = self.parse_info_xml(bundle_path)
             if not info:
                 bundles_without_info += 1
-                if idx < 3:
+                if idx < 5:
                     print(f"[scan_library] WARNING: No valid Info.xml found for {bundle_path.name}")
+                    # Show what's actually IN this bundle
+                    print(f"[scan_library] Bundle contents:")
+                    try:
+                        for item in bundle_path.iterdir():
+                            print(f"[scan_library]   - {item.name} ({'dir' if item.is_dir() else 'file'})")
+                            if item.is_dir() and item.name == "Contents":
+                                print(f"[scan_library]   Contents subdirectories:")
+                                for subitem in item.iterdir():
+                                    print(f"[scan_library]     - {subitem.name} ({'dir' if subitem.is_dir() else 'file'})")
+                    except Exception as e:
+                        print(f"[scan_library]   ERROR listing bundle: {e}")
                 continue
 
-            if idx < 3:
+            if idx < 5:
                 print(f"[scan_library] Found info: {info.get('title', 'Unknown')}")
 
             # Get artwork
@@ -317,7 +329,7 @@ class PlexScanner:
 
             # Count total artwork items
             total_artwork = sum(len(v) for v in artwork.values())
-            if idx < 3:
+            if idx < 5:
                 print(f"[scan_library] Found {total_artwork} artwork files")
 
             if total_artwork > 0:  # Only include items with artwork
@@ -330,12 +342,14 @@ class PlexScanner:
                 })
             else:
                 bundles_without_artwork += 1
+                bundles_with_info_but_no_artwork += 1
 
         print(f"\n[scan_library] Scan complete!")
         print(f"[scan_library] Results summary:")
         print(f"  - Total bundles scanned: {total}")
         print(f"  - Bundles without Info.xml: {bundles_without_info}")
-        print(f"  - Bundles without artwork: {bundles_without_artwork}")
+        print(f"  - Bundles WITH Info.xml but NO artwork: {bundles_with_info_but_no_artwork}")
+        print(f"  - Bundles without artwork (total): {bundles_without_artwork}")
         print(f"  - Bundles with artwork (returned): {len(results)}")
 
         return results
