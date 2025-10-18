@@ -408,6 +408,7 @@ function App() {
                 selectedArtwork={selectedArtwork}
                 onSelectArtwork={handleSelectArtwork}
                 onDeleteArtwork={handleDeleteArtwork}
+                thumbnailSize={config?.thumbnail_size?.[0] || 300}
               />
             ))
           ) : (

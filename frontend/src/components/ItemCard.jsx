@@ -1,11 +1,19 @@
 import React from 'react';
 import ArtworkCard from './ArtworkCard';
 
-const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork }) => {
+const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300 }) => {
   const [expanded, setExpanded] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('posters');
 
   const { info, artwork, total_artwork } = item;
+
+  // Determine grid columns based on thumbnail size
+  const getGridCols = () => {
+    if (thumbnailSize <= 150) return 'grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9';
+    if (thumbnailSize <= 250) return 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8';
+    if (thumbnailSize <= 350) return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6';
+    return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'; // Large thumbnails
+  };
 
   const tabs = [
     { id: 'posters', label: 'Posters', count: artwork.posters?.length || 0 },
@@ -83,7 +91,7 @@ const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork }) =
 
           {/* Artwork Grid */}
           {currentArtwork.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className={`grid ${getGridCols()} gap-4`}>
               {currentArtwork.map((art) => (
                 <ArtworkCard
                   key={art.path}
@@ -92,6 +100,7 @@ const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork }) =
                   isSelected={selectedArtwork.includes(art.path)}
                   onSelect={onSelectArtwork}
                   onDelete={onDeleteArtwork}
+                  thumbnailSize={thumbnailSize}
                 />
               ))}
             </div>

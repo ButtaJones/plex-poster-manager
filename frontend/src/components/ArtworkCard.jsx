@@ -1,8 +1,14 @@
 import React from 'react';
 
-const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete }) => {
+const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailSize = 300 }) => {
   const getThumbnailUrl = (thumbUrl) => {
     return `http://localhost:5000/api/thumbnail?url=${encodeURIComponent(thumbUrl)}`;
+  };
+
+  // Calculate display size (max-width based on thumbnail size setting)
+  const cardStyle = {
+    maxWidth: `${thumbnailSize}px`,
+    margin: '0 auto' // Center cards in their grid cells
   };
 
   const getProviderBadgeColor = (provider) => {
@@ -31,6 +37,7 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete }) => {
 
   return (
     <div
+      style={cardStyle}
       className={`relative border rounded-lg overflow-hidden transition-all ${
         isSelected
           ? 'ring-4 ring-blue-500 border-blue-500'
