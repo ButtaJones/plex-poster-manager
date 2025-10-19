@@ -207,6 +207,10 @@ class PlexPosterManagerLauncher:
                                          command=self.check_for_updates)
         self.update_button.pack(side="left", padx=5, fill="x", expand=True)
 
+        self.deps_button = ttk.Button(control_frame, text="📦 Update Dependencies",
+                                       command=self.update_dependencies)
+        self.deps_button.pack(side="left", padx=5, fill="x", expand=True)
+
         # --- Log Output Section ---
         log_frame = ttk.LabelFrame(main_frame, text="Server Output", padding="10")
         log_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(0, 10))
@@ -671,6 +675,78 @@ class PlexPosterManagerLauncher:
         if self.check_dependencies():
             self.log("\n🚀 Auto-starting servers (configured in settings)...\n")
             self.start_servers()
+
+    def update_dependencies(self):
+        """Update backend and frontend dependencies after git pull."""
+        self.log("\n📦 Updating dependencies...")
+
+        if not messagebox.askyesno(
+            "Update Dependencies",
+            "This will install/update all dependencies:\n\n"
+            "• Backend (pip install -r requirements.txt)\n"
+            "• Frontend (npm install)\n\n"
+            "This is necessary after running 'git pull' to get new dependencies.\n\n"
+            "Continue?"
+        ):
+            self.log("ℹ Update cancelled")
+            return
+
+        try:
+            # Update backend dependencies
+            self.log("\n📦 Updating backend dependencies...")
+
+            if platform.system() == "Windows":
+                pip_exe = BACKEND_DIR / "venv" / "Scripts" / "pip.exe"
+            else:
+                pip_exe = BACKEND_DIR / "venv" / "bin" / "pip"
+
+            result = subprocess.run(
+                [str(pip_exe), "install", "-r", "requirements.txt"],
+                cwd=str(BACKEND_DIR),
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                self.log(f"✗ Backend update failed: {result.stderr}")
+                messagebox.showerror(
+                    "Update Failed",
+                    f"Failed to update backend dependencies:\n\n{result.stderr}"
+                )
+                return
+
+            self.log("✓ Backend dependencies updated")
+
+            # Update frontend dependencies
+            self.log("\n📦 Updating frontend dependencies...")
+
+            result = subprocess.run(
+                [NPM_CMD, "install"],
+                cwd=str(FRONTEND_DIR),
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                self.log(f"✗ Frontend update failed: {result.stderr}")
+                messagebox.showerror(
+                    "Update Failed",
+                    f"Failed to update frontend dependencies:\n\n{result.stderr}"
+                )
+                return
+
+            self.log("✓ Frontend dependencies updated")
+
+            self.log("\n✓ All dependencies updated successfully!")
+            messagebox.showinfo(
+                "Update Complete",
+                "All dependencies have been updated!\n\n"
+                "You can now restart the servers if they were running."
+            )
+
+        except Exception as e:
+            self.log(f"\n✗ Update failed: {e}")
+            messagebox.showerror("Update Failed", f"An error occurred:\n\n{str(e)}")
 
     def check_for_updates(self):
         """Check GitHub for latest release and offer to update."""
