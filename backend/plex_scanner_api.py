@@ -20,6 +20,8 @@ from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from pathlib import Path
 from typing import List, Dict, Optional
 import hashlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 
 class PlexScannerAPI:
@@ -143,24 +145,41 @@ class PlexScannerAPI:
             else:
                 print(f"[scan_library] Found {total_items} items in library (scanning all)")
 
-            for idx, content in enumerate(all_content):
-                if idx < 5:  # Detailed logging for first 5 items
+            # Use threading to process items in parallel (5 workers for speed)
+            print(f"[scan_library] Processing {len(all_content)} items with parallel threads...")
+
+            def process_item(idx_content_tuple):
+                idx, content = idx_content_tuple
+                if idx < 5:
                     print(f"\n[scan_library] Processing item {idx + 1}: {content.title}")
                 elif idx == 5:
                     print(f"\n[scan_library] Processing remaining items (summary mode)...")
 
-                # Report progress
-                if progress_callback:
-                    progress_callback(idx + 1, total_items, content.title)
-
                 try:
                     item_data = self._get_item_artwork(content, detailed=idx < 5)
                     if item_data['total_artwork'] > 0:
-                        items.append(item_data)
+                        return item_data
                 except Exception as e:
                     if idx < 5:
                         print(f"[scan_library] ERROR processing {content.title}: {e}")
-                    continue
+                return None
+
+            # Process items in parallel with ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                future_to_item = {executor.submit(process_item, (idx, content)): idx
+                                  for idx, content in enumerate(all_content)}
+
+                for future in as_completed(future_to_item):
+                    idx = future_to_item[future]
+                    if progress_callback:
+                        progress_callback(idx + 1, total_items, all_content[idx].title)
+
+                    try:
+                        item_data = future.result()
+                        if item_data:
+                            items.append(item_data)
+                    except Exception as e:
+                        print(f"[scan_library] ERROR in thread: {e}")
 
             print(f"\n[scan_library] Scan complete!")
             print(f"[scan_library] Total items with artwork: {len(items)}")
