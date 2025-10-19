@@ -279,12 +279,19 @@ function App() {
       return;
     }
 
-    // Scroll to top of page
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
     // Calculate slice indices for client-side pagination
     const startIdx = (newPage - 1) * scanLimit;
     const endIdx = startIdx + scanLimit;
+
+    // Check if requested page is beyond cached data
+    if (startIdx >= allItems.length) {
+      console.log('[handlePageChange] BLOCKED: Page beyond cached data');
+      alert(`Only ${allItems.length} items are currently loaded. Please scan with "No Limit" or increase "Items Per Page" to load more.`);
+      return;
+    }
+
+    // Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     console.log('[handlePageChange] Slice range:', startIdx, '-', endIdx);
 
@@ -549,24 +556,46 @@ function App() {
               </div>
             )}
 
-            {/* Artwork Thumbnail Size Slider (Grid View) */}
+            {/* Grid View Sliders: Poster Size + Artwork Size */}
             {viewMode === 'grid' && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                    <SlidersHorizontal className="w-4 h-4" />
-                    Artwork Size: {thumbnailSize}px
-                  </label>
+              <div className="space-y-4">
+                {/* Library Poster Size Slider */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                      <LayoutGrid className="w-4 h-4" />
+                      Library Poster Size: {libraryThumbnailSize}px
+                    </label>
+                  </div>
+                  <input
+                    type="range"
+                    min="100"
+                    max="400"
+                    step="1"
+                    value={libraryThumbnailSize}
+                    onChange={(e) => setLibraryThumbnailSize(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min="150"
-                  max="500"
-                  step="1"
-                  value={thumbnailSize}
-                  onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
-                  className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
-                />
+
+                {/* Artwork Size Slider */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                      <SlidersHorizontal className="w-4 h-4" />
+                      Artwork Size: {thumbnailSize}px
+                    </label>
+                  </div>
+                  <input
+                    type="range"
+                    min="150"
+                    max="500"
+                    step="1"
+                    value={thumbnailSize}
+                    onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
+                  />
+                </div>
               </div>
             )}
           </div>
