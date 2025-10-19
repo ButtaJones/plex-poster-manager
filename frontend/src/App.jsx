@@ -287,18 +287,16 @@ function App() {
     }, 500);
 
     try {
-      // Scan a larger batch for caching (10x the page size, or 250 items minimum)
-      // This gives us enough items for multiple pages without scanning everything
-      const batchSize = scanLimit ? Math.max(scanLimit * 10, 250) : null;
-      const response = await libraryAPI.scanLibrary(selectedLibrary, batchSize, 0);
+      // ALWAYS scan ALL items (limit=null) so search works across entire library
+      // scanLimit is ONLY for pagination display, not for scanning
+      const response = await libraryAPI.scanLibrary(selectedLibrary, null, 0);
       const scannedItems = response.data.items;
-      const totalItems = response.data.stats.total_count || 0;
+      const totalItems = response.data.stats.total_count || scannedItems.length;
 
-      console.log('[handleScan] Scanned items:', scannedItems.length);
-      console.log('[handleScan] Total items:', totalItems);
-      console.log('[handleScan] Batch size:', batchSize);
+      console.log('[handleScan] Scanned ALL items:', scannedItems.length);
+      console.log('[handleScan] Total items in library:', totalItems);
 
-      // Cache all scanned items
+      // Cache all scanned items for search and pagination
       setAllItems(scannedItems);
       setTotalCount(totalItems);
       setStats(response.data.stats);
@@ -355,7 +353,7 @@ function App() {
     // Check if requested page is beyond cached data
     if (startIdx >= allItems.length) {
       console.log('[handlePageChange] BLOCKED: Page beyond cached data');
-      alert(`Only ${allItems.length} items are currently loaded. Please scan with "No Limit" or increase "Items Per Page" to load more.`);
+      alert(`You've reached the end of the scanned items (${allItems.length} total). Please run a new scan to refresh the library.`);
       return;
     }
 
