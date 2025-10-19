@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Plex Token</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #e5a00d;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #e5a00d;
+        }
+        .token-display {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            word-break: break-all;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        button {
+            background: #e5a00d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #cc8f0c;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Plex Token Retriever</h1>
+
+        <div class="step">
+            <h3>Step 1: Open Plex Web App</h3>
+            <p>You need to have Plex Web App open in another tab. If you haven't already:</p>
+            <ol>
+                <li>Open a new tab</li>
+                <li>Go to: <strong>http://192.168.5.141:32400/web</strong></li>
+                <li>Log in to Plex if not already logged in</li>
+                <li>Come back to this tab</li>
+            </ol>
+            <button onclick="window.open('http://192.168.5.141:32400/web', '_blank')">Open Plex Web App</button>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Extract Token from Browser</h3>
+            <p>This will read the Plex token from your browser's localStorage:</p>
+            <button onclick="getPlexToken()">Get My Plex Token</button>
+            <div id="result" style="margin-top: 15px;"></div>
+        </div>
+
+        <div class="step">
+            <h3>Alternative Method: Browser Console</h3>
+            <p>If the button above doesn't work, you can manually get the token:</p>
+            <ol>
+                <li>Go to the Plex Web App tab</li>
+                <li>Press <kbd>F12</kbd> to open Developer Tools</li>
+                <li>Click on the <strong>Console</strong> tab</li>
+                <li>Paste this command and press Enter:</li>
+            </ol>
+            <div class="token-display">
+                localStorage.getItem('myPlexAccessToken') || window.localStorage.getItem('myPlexAccessToken')
+            </div>
+            <p>Copy the token (without quotes) and paste it into the launcher.</p>
+        </div>
+    </div>
+
+    <script>
+        function getPlexToken() {
+            const resultDiv = document.getElementById('result');
+
+            try {
+                // Try to get token from localStorage (if same origin)
+                let token = localStorage.getItem('myPlexAccessToken');
+
+                if (!token) {
+                    // Try alternative keys
+                    token = localStorage.getItem('plexToken') ||
+                           localStorage.getItem('X-Plex-Token');
+                }
+
+                if (token) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✓ Token found!</p>
+                        <div class="token-display" id="tokenValue">${token}</div>
+                        <button onclick="copyToken()">Copy Token</button>
+                        <p style="margin-top: 10px; font-size: 14px;">
+                            <strong>Next step:</strong> Copy this token and paste it into the
+                            "Plex Token" field in the launcher, then click "Save & Test".
+                        </p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">✗ Token not found in localStorage</p>
+                        <p>This might happen if:</p>
+                        <ul>
+                            <li>You're not logged into Plex Web App</li>
+                            <li>The browser security prevents cross-origin access</li>
+                        </ul>
+                        <p><strong>Please use the Alternative Method below.</strong></p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">✗ Cannot access localStorage: ${error.message}</p>
+                    <p><strong>Please use the Alternative Method below.</strong></p>
+                    <p>You'll need to run the console command directly in the Plex Web App tab.</p>
+                `;
+            }
+        }
+
+        function copyToken() {
+            const tokenValue = document.getElementById('tokenValue').textContent;
+            navigator.clipboard.writeText(tokenValue).then(() => {
+                alert('Token copied to clipboard! ✓\n\nNow paste it into the launcher.');
+            }).catch(err => {
+                alert('Could not copy automatically. Please select and copy the token manually.');
+            });
+        }
+    </script>
+</body>
+</html>
