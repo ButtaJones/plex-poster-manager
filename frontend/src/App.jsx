@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings, RefreshCw, Search, Trash2, X, Moon, Sun,
-  Film, Image, Eye, History, ChevronDown, Loader, SlidersHorizontal
+  Film, Image, Eye, History, ChevronDown, Loader, SlidersHorizontal,
+  LayoutGrid, List
 } from 'lucide-react';
 import ConfigModal from './components/ConfigModal';
 import ItemCard from './components/ItemCard';
@@ -20,7 +21,7 @@ function App() {
   const [operations, setOperations] = useState([]);
   const [showOperations, setShowOperations] = useState(false);
   const [scanProgress, setScanProgress] = useState(null);
-  const [scanLimit, setScanLimit] = useState(null); // null = scan all
+  const [scanLimit, setScanLimit] = useState(25); // Default to 25 items
   const [offset, setOffset] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -34,6 +35,14 @@ function App() {
     return saved ? parseInt(saved) : 300;
   });
   const [showSizeSlider, setShowSizeSlider] = useState(false);
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem('viewMode');
+    return saved || 'list'; // 'list' or 'grid'
+  });
+  const [libraryThumbnailSize, setLibraryThumbnailSize] = useState(() => {
+    const saved = localStorage.getItem('libraryThumbnailSize');
+    return saved ? parseInt(saved) : 200;
+  });
 
   // Save dark mode preference
   useEffect(() => {
@@ -49,6 +58,16 @@ function App() {
   useEffect(() => {
     localStorage.setItem('thumbnailSize', thumbnailSize.toString());
   }, [thumbnailSize]);
+
+  // Save view mode preference
+  useEffect(() => {
+    localStorage.setItem('viewMode', viewMode);
+  }, [viewMode]);
+
+  // Save library thumbnail size preference
+  useEffect(() => {
+    localStorage.setItem('libraryThumbnailSize', libraryThumbnailSize.toString());
+  }, [libraryThumbnailSize]);
 
   const loadLibraries = useCallback(async () => {
     try {
@@ -371,30 +390,78 @@ function App() {
             </div>
           </div>
 
-          {/* Thumbnail Size Slider */}
+          {/* View Mode Toggle & Thumbnail Size Controls */}
           <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-gray-700/50' : 'bg-purple-50'}`}>
-            <div className="flex items-center justify-between mb-3">
+            {/* View Mode Toggle */}
+            <div className="flex items-center justify-between mb-4">
               <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                <SlidersHorizontal className="w-4 h-4" />
-                Thumbnail Size: {thumbnailSize}px
+                <Eye className="w-4 h-4" />
+                View Mode
               </label>
-              <button
-                onClick={() => setShowSizeSlider(!showSizeSlider)}
-                className={`text-xs px-3 py-1 rounded-md ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-purple-200 hover:bg-purple-300 text-purple-800'} transition-colors`}
-              >
-                {showSizeSlider ? 'Hide' : 'Show'} Slider
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${viewMode === 'list' ? (darkMode ? 'bg-purple-600 text-white' : 'bg-purple-600 text-white') : (darkMode ? 'bg-gray-600 text-gray-300 hover:bg-gray-500' : 'bg-purple-200 text-purple-800 hover:bg-purple-300')}`}
+                >
+                  <List className="w-4 h-4" />
+                  <span className="hidden sm:inline">List</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${viewMode === 'grid' ? (darkMode ? 'bg-purple-600 text-white' : 'bg-purple-600 text-white') : (darkMode ? 'bg-gray-600 text-gray-300 hover:bg-gray-500' : 'bg-purple-200 text-purple-800 hover:bg-purple-300')}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  <span className="hidden sm:inline">Grid</span>
+                </button>
+              </div>
             </div>
-            {showSizeSlider && (
-              <input
-                type="range"
-                min="150"
-                max="500"
-                step="10"
-                value={thumbnailSize}
-                onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
-              />
+
+            {/* Artwork Thumbnail Size Slider */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                  <SlidersHorizontal className="w-4 h-4" />
+                  Artwork Size: {thumbnailSize}px
+                </label>
+                <button
+                  onClick={() => setShowSizeSlider(!showSizeSlider)}
+                  className={`text-xs px-3 py-1 rounded-md ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-purple-200 hover:bg-purple-300 text-purple-800'} transition-colors`}
+                >
+                  {showSizeSlider ? 'Hide' : 'Show'} Slider
+                </button>
+              </div>
+              {showSizeSlider && (
+                <input
+                  type="range"
+                  min="150"
+                  max="500"
+                  step="1"
+                  value={thumbnailSize}
+                  onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
+                />
+              )}
+            </div>
+
+            {/* Library Thumbnail Size Slider (only in grid mode) */}
+            {viewMode === 'grid' && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                    <LayoutGrid className="w-4 h-4" />
+                    Library Poster Size: {libraryThumbnailSize}px
+                  </label>
+                </div>
+                <input
+                  type="range"
+                  min="100"
+                  max="400"
+                  step="1"
+                  value={libraryThumbnailSize}
+                  onChange={(e) => setLibraryThumbnailSize(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
+                />
+              </div>
             )}
           </div>
 
@@ -429,19 +496,19 @@ function App() {
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-              <div className={`${darkMode ? 'bg-gradient-to-br from-blue-600 to-blue-700' : 'bg-gradient-to-br from-blue-500 to-blue-600'} text-white p-4 rounded-xl shadow-lg`}>
-                <div className="text-3xl font-bold">{stats.total_items}</div>
-                <div className="text-sm opacity-90 mt-1">Total Items</div>
+              <div className={`${darkMode ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700' : 'bg-gradient-to-br from-blue-400 via-blue-500 to-indigo-600'} text-white p-5 rounded-xl shadow-xl transform hover:scale-105 transition-transform duration-200`}>
+                <div className="text-4xl font-bold drop-shadow-lg">{stats.total_items}</div>
+                <div className="text-sm font-medium opacity-95 mt-2">Total Items</div>
               </div>
-              <div className={`${darkMode ? 'bg-gradient-to-br from-green-600 to-green-700' : 'bg-gradient-to-br from-green-500 to-green-600'} text-white p-4 rounded-xl shadow-lg`}>
-                <div className="text-3xl font-bold">{stats.total_artwork}</div>
-                <div className="text-sm opacity-90 mt-1">Artwork Files</div>
+              <div className={`${darkMode ? 'bg-gradient-to-br from-emerald-500 via-green-600 to-teal-700' : 'bg-gradient-to-br from-emerald-400 via-green-500 to-teal-600'} text-white p-5 rounded-xl shadow-xl transform hover:scale-105 transition-transform duration-200`}>
+                <div className="text-4xl font-bold drop-shadow-lg">{stats.total_artwork}</div>
+                <div className="text-sm font-medium opacity-95 mt-2">Artwork Files</div>
               </div>
-              <div className={`${darkMode ? 'bg-gradient-to-br from-purple-600 to-purple-700' : 'bg-gradient-to-br from-purple-500 to-purple-600'} text-white p-4 rounded-xl shadow-lg`}>
-                <div className="text-3xl font-bold">{items.length}</div>
-                <div className="text-sm opacity-90 mt-1">Items Shown</div>
+              <div className={`${darkMode ? 'bg-gradient-to-br from-purple-500 via-violet-600 to-fuchsia-700' : 'bg-gradient-to-br from-purple-400 via-violet-500 to-fuchsia-600'} text-white p-5 rounded-xl shadow-xl transform hover:scale-105 transition-transform duration-200`}>
+                <div className="text-4xl font-bold drop-shadow-lg">{items.length}</div>
+                <div className="text-sm font-medium opacity-95 mt-2">Items Shown</div>
               </div>
-              <div className={`${darkMode ? 'bg-gradient-to-br from-orange-600 to-orange-700' : 'bg-gradient-to-br from-orange-500 to-orange-600'} text-white p-4 rounded-xl shadow-lg cursor-pointer hover:opacity-90 transition-opacity`}>
+              <div className={`${darkMode ? 'bg-gradient-to-br from-orange-500 via-amber-600 to-yellow-700' : 'bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-600'} text-white p-5 rounded-xl shadow-xl cursor-pointer transform hover:scale-105 transition-all duration-200`}>
                 <button
                   onClick={() => {
                     loadOperations();
@@ -449,11 +516,11 @@ function App() {
                   }}
                   className="w-full text-left"
                 >
-                  <div className="text-3xl font-bold flex items-center gap-2">
+                  <div className="text-4xl font-bold drop-shadow-lg flex items-center gap-2">
                     {operations.length}
-                    <ChevronDown className={`w-5 h-5 transition-transform ${showOperations ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-6 h-6 transition-transform duration-200 ${showOperations ? 'rotate-180' : ''}`} />
                   </div>
-                  <div className="text-sm opacity-90 mt-1">Recent Operations</div>
+                  <div className="text-sm font-medium opacity-95 mt-2">Recent Operations</div>
                 </button>
               </div>
             </div>
@@ -504,8 +571,8 @@ function App() {
           </div>
         )}
 
-        {/* Items List */}
-        <div className="space-y-4">
+        {/* Items List/Grid */}
+        <div className={viewMode === 'list' ? 'space-y-4' : ''}>
           {loading ? (
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
               <Loader className={`w-12 h-12 mx-auto mb-4 animate-spin ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
@@ -539,7 +606,8 @@ function App() {
                 </div>
               )}
 
-              {items.map((item, index) => (
+              {/* List View */}
+              {viewMode === 'list' && items.map((item, index) => (
                 <ItemCard
                   key={index}
                   item={item}
@@ -550,6 +618,58 @@ function App() {
                   darkMode={darkMode}
                 />
               ))}
+
+              {/* Grid View */}
+              {viewMode === 'grid' && (
+                <div
+                  className="grid gap-4 mb-4"
+                  style={{
+                    gridTemplateColumns: `repeat(auto-fill, minmax(${libraryThumbnailSize}px, 1fr))`
+                  }}
+                >
+                  {items.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`rounded-xl overflow-hidden shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}
+                      onClick={() => {
+                        // Expand this item in list view
+                        setViewMode('list');
+                        // Scroll to this item after a brief delay for mode change
+                        setTimeout(() => {
+                          const element = document.getElementById(`item-${index}`);
+                          element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 100);
+                      }}
+                      style={{
+                        width: `${libraryThumbnailSize}px`,
+                        justifySelf: 'center'
+                      }}
+                    >
+                      {/* Show first poster/artwork as thumbnail */}
+                      {item.artwork && item.artwork.length > 0 ? (
+                        <img
+                          src={item.artwork[0].thumbnail_url}
+                          alt={item.info.title}
+                          className="w-full aspect-[2/3] object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className={`w-full aspect-[2/3] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                          <Image className={`w-12 h-12 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <h3 className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                          {item.info.title}
+                        </h3>
+                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {item.artwork?.length || 0} artwork files
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Load More Button */}
               {scanLimit && offset < totalCount && (
