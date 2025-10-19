@@ -20,11 +20,10 @@ const ArtworkCard = React.memo(({ artwork, item, onSelect, isSelected, onDelete,
   };
 
   // Calculate display size based on thumbnail size setting
-  // Use max-width to prevent overflow, height uses aspect-ratio for proper poster proportions
+  // Uses same pattern as library poster slider for instant responsiveness
   const cardStyle = {
-    maxWidth: `${thumbnailSize}px`,
-    width: '100%', // Take full width of grid cell up to maxWidth
-    margin: '0 auto' // Center cards in their grid cells
+    width: `${thumbnailSize}px`,
+    justifySelf: 'center'
   };
 
   const getProviderBadgeColor = (provider) => {
