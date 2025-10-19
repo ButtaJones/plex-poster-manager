@@ -363,9 +363,18 @@ def get_thumbnail():
 
     try:
         # Fetch image from Plex
+        print(f"[thumbnail] Fetching: {thumb_url[:100]}...")
         response = requests.get(thumb_url, timeout=10)
+
         if response.status_code != 200:
-            return jsonify({"error": "Failed to fetch thumbnail from Plex"}), 404
+            print(f"[thumbnail] HTTP {response.status_code} for URL: {thumb_url[:100]}")
+            return jsonify({"error": f"Plex returned {response.status_code}"}), 404
+
+        # Check if response is actually an image
+        content_type = response.headers.get('Content-Type', '')
+        if not content_type.startswith('image/'):
+            print(f"[thumbnail] Invalid content type: {content_type}")
+            return jsonify({"error": f"Invalid content type: {content_type}"}), 400
 
         # Open and resize image
         img = Image.open(io.BytesIO(response.content))
@@ -390,8 +399,16 @@ def get_thumbnail():
         response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
         return response
 
+    except requests.exceptions.Timeout:
+        print(f"[thumbnail] Timeout fetching URL: {thumb_url[:100]}")
+        return jsonify({"error": "Request timeout"}), 504
+    except requests.exceptions.RequestException as e:
+        print(f"[thumbnail] Request error: {e}")
+        return jsonify({"error": f"Network error: {str(e)}"}), 500
     except Exception as e:
-        print(f"[thumbnail] ERROR: {e}")
+        print(f"[thumbnail] ERROR processing {thumb_url[:100]}: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 

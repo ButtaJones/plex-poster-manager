@@ -12,6 +12,7 @@ function App() {
   const [config, setConfig] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
   const [libraries, setLibraries] = useState([]);
+  const [librariesLoading, setLibrariesLoading] = useState(false);
   const [selectedLibrary, setSelectedLibrary] = useState('TV Shows');
   const [items, setItems] = useState([]);
   const [selectedArtwork, setSelectedArtwork] = useState([]);
@@ -70,6 +71,7 @@ function App() {
   }, [libraryThumbnailSize]);
 
   const loadLibraries = useCallback(async () => {
+    setLibrariesLoading(true);
     try {
       const response = await libraryAPI.getLibraries();
       const libs = response.data.libraries || [];
@@ -82,6 +84,8 @@ function App() {
       }
     } catch (error) {
       console.error('Error loading libraries:', error);
+    } finally {
+      setLibrariesLoading(false);
     }
   }, [selectedLibrary]);
 
@@ -318,9 +322,11 @@ function App() {
                 value={selectedLibrary}
                 onChange={(e) => setSelectedLibrary(e.target.value)}
                 className={`w-full h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                disabled={libraries.length === 0}
+                disabled={librariesLoading || libraries.length === 0}
               >
-                {libraries.length === 0 ? (
+                {librariesLoading ? (
+                  <option value="">Loading libraries...</option>
+                ) : libraries.length === 0 ? (
                   <option value="">No libraries found</option>
                 ) : (
                   libraries.map((lib) => {
@@ -391,10 +397,10 @@ function App() {
               <button
                 onClick={handleScan}
                 disabled={loading}
-                className={`w-full h-11 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`w-full h-11 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 leading-none ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Scanning...' : 'Scan Library'}
+                <span className="leading-none">{loading ? 'Scanning...' : 'Scan Library'}</span>
               </button>
             </div>
           </div>
@@ -666,7 +672,7 @@ function App() {
 
                         return firstPoster ? (
                           <img
-                            src={firstPoster.thumbnail_url}
+                            src={firstPoster.thumb_url}
                             alt={item.info.title}
                             className="w-full aspect-[2/3] object-cover"
                             loading="lazy"
