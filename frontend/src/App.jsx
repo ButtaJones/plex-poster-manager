@@ -26,6 +26,7 @@ function App() {
   const [scanLimit, setScanLimit] = useState(25); // Default to 25 items
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [allItems, setAllItems] = useState([]); // Cache all scanned items for pagination
 
   // New UI state
   const [darkMode, setDarkMode] = useState(() => {
@@ -183,10 +184,20 @@ function App() {
     }, 500);
 
     try {
+      // Scan ALL items (no limit) and cache them for client-side pagination
       const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit, 0);
-      setItems(response.data.items);
+      const scannedItems = response.data.items;
+      const totalItems = response.data.stats.total_count || 0;
+
+      // Cache all scanned items
+      setAllItems(scannedItems);
+      setTotalCount(totalItems);
       setStats(response.data.stats);
-      setTotalCount(response.data.stats.total_count || 0);
+
+      // Show first page from cached data
+      const firstPageItems = scanLimit ? scannedItems.slice(0, scanLimit) : scannedItems;
+      setItems(firstPageItems);
+
       clearInterval(progressInterval);
       setScanProgress(null);
     } catch (error) {
@@ -217,44 +228,20 @@ function App() {
     }
   };
 
-  const handlePageChange = async (newPage) => {
-    if (!selectedLibrary || !scanLimit) return;
+  const handlePageChange = (newPage) => {
+    if (!scanLimit || allItems.length === 0) return;
 
     // Scroll to top of page
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    setLoading(true);
+    // Calculate slice indices for client-side pagination
+    const startIdx = (newPage - 1) * scanLimit;
+    const endIdx = startIdx + scanLimit;
+
+    // Slice from cached items (no API call needed!)
+    const pageItems = allItems.slice(startIdx, endIdx);
+    setItems(pageItems);
     setCurrentPage(newPage);
-    const newOffset = (newPage - 1) * scanLimit;
-    setScanProgress({ scanning: true, current: 0, total: 0, current_item: '' });
-
-    const progressInterval = setInterval(async () => {
-      try {
-        const progressResponse = await libraryAPI.getScanProgress();
-        setScanProgress(progressResponse.data);
-
-        if (!progressResponse.data.scanning) {
-          clearInterval(progressInterval);
-        }
-      } catch (error) {
-        console.error('Error fetching progress:', error);
-      }
-    }, 500);
-
-    try {
-      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit, newOffset);
-      setItems(response.data.items);
-      setStats(response.data.stats);
-      clearInterval(progressInterval);
-      setScanProgress(null);
-    } catch (error) {
-      console.error('Error changing page:', error);
-      alert('Error changing page: ' + error.message);
-      clearInterval(progressInterval);
-      setScanProgress(null);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSelectArtwork = (path) => {
@@ -391,7 +378,7 @@ function App() {
                 </select>
                 {/* Spinning loader icon when loading libraries */}
                 {librariesLoading && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <div className="absolute right-10 top-1/2 transform -translate-y-1/2 pointer-events-none">
                     <Loader className={`w-5 h-5 animate-spin ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
                   </div>
                 )}
@@ -672,7 +659,7 @@ function App() {
                     totalPages={Math.ceil(totalCount / scanLimit)}
                     totalCount={totalCount}
                     itemsPerPage={scanLimit}
-                    itemsShown={items.length}
+                    itemsShown={Math.min(currentPage * scanLimit, totalCount)}
                     onPageChange={handlePageChange}
                     darkMode={darkMode}
                   />
@@ -789,7 +776,7 @@ function App() {
                     totalPages={Math.ceil(totalCount / scanLimit)}
                     totalCount={totalCount}
                     itemsPerPage={scanLimit}
-                    itemsShown={items.length}
+                    itemsShown={Math.min(currentPage * scanLimit, totalCount)}
                     onPageChange={handlePageChange}
                     darkMode={darkMode}
                   />

@@ -95,8 +95,9 @@ class PlexScannerAPI:
         try:
             libraries = []
             for section in self.plex.library.sections():
-                # Get total item count for this library
-                item_count = len(section.all())
+                # Use totalSize property instead of loading all items
+                # This is MUCH faster (instant vs 30 seconds)
+                item_count = section.totalSize
                 libraries.append({
                     'name': section.title,
                     'count': item_count
