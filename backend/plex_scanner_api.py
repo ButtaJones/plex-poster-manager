@@ -171,12 +171,13 @@ class PlexScannerAPI:
             traceback.print_exc()
             return {'items': [], 'total_count': 0}
 
-    def _build_thumb_url(self, thumb_path: str) -> str:
+    def _build_thumb_url(self, thumb_path: str, item_rating_key: str = None) -> str:
         """
         Build complete thumbnail URL, handling both relative and absolute URLs.
 
         Args:
             thumb_path: Thumb path from PlexAPI (can be relative or absolute URL)
+            item_rating_key: Optional rating key of the parent item (for fallback)
 
         Returns:
             Complete thumbnail URL with token
@@ -186,9 +187,24 @@ class PlexScannerAPI:
             # External URLs (Plex transcoder, TVDB, TMDB, etc.) - use as-is
             # These are already authenticated or publicly accessible
             return thumb_path
-        else:
-            # It's a relative path to local Plex server - prepend server URL and token
-            return f"{self.plex_url}{thumb_path}?X-Plex-Token={self.plex_token}"
+
+        # Handle internal Plex metadata references (metadata://, upload://, etc.)
+        if '/file?url=' in thumb_path or 'metadata://' in thumb_path or 'upload://' in thumb_path:
+            # These are internal Plex references that don't work well as direct URLs
+            # Use the item's thumb endpoint instead if available
+            if item_rating_key:
+                return f"{self.plex_url}/library/metadata/{item_rating_key}/thumb?X-Plex-Token={self.plex_token}"
+            # If no rating key, try to extract it from the path
+            if '/library/metadata/' in thumb_path:
+                # Extract rating key from path like /library/metadata/303344/file?...
+                import re
+                match = re.search(r'/library/metadata/(\d+)/', thumb_path)
+                if match:
+                    rating_key = match.group(1)
+                    return f"{self.plex_url}/library/metadata/{rating_key}/thumb?X-Plex-Token={self.plex_token}"
+
+        # It's a relative path to local Plex server - prepend server URL and token
+        return f"{self.plex_url}{thumb_path}?X-Plex-Token={self.plex_token}"
 
     def _get_item_artwork(self, item, detailed: bool = False) -> Dict:
         """
@@ -220,7 +236,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/poster/{rating_key}",  # Unique path for React keys
                     "provider": poster.provider if hasattr(poster, 'provider') else "unknown",
                     "selected": poster.selected if hasattr(poster, 'selected') else False,
-                    "thumb_url": self._build_thumb_url(poster.thumb),
+                    "thumb_url": self._build_thumb_url(poster.thumb, item.ratingKey),
                     "rating_key": rating_key,
                     "type": "poster"
                 })
@@ -240,7 +256,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/art/{rating_key}",  # Unique path for React keys
                     "provider": art.provider if hasattr(art, 'provider') else "unknown",
                     "selected": art.selected if hasattr(art, 'selected') else False,
-                    "thumb_url": self._build_thumb_url(art.thumb),
+                    "thumb_url": self._build_thumb_url(art.thumb, item.ratingKey),
                     "rating_key": rating_key,
                     "type": "background"
                 })
@@ -260,7 +276,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/banner/{rating_key}",  # Unique path for React keys
                     "provider": banner.provider if hasattr(banner, 'provider') else "unknown",
                     "selected": banner.selected if hasattr(banner, 'selected') else False,
-                    "thumb_url": self._build_thumb_url(banner.thumb),
+                    "thumb_url": self._build_thumb_url(banner.thumb, item.ratingKey),
                     "rating_key": rating_key,
                     "type": "banner"
                 })
@@ -280,7 +296,7 @@ class PlexScannerAPI:
                     "path": f"{item.ratingKey}/theme/{rating_key}",  # Unique path for React keys
                     "provider": theme.provider if hasattr(theme, 'provider') else "unknown",
                     "selected": theme.selected if hasattr(theme, 'selected') else False,
-                    "thumb_url": self._build_thumb_url(theme.thumb),
+                    "thumb_url": self._build_thumb_url(theme.thumb, item.ratingKey),
                     "rating_key": rating_key,
                     "type": "theme"
                 })
