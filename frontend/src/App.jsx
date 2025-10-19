@@ -48,7 +48,6 @@ function App() {
     }
     return 300;
   });
-  const [showSizeSlider, setShowSizeSlider] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     const saved = localStorage.getItem('viewMode');
     return saved || 'list'; // 'list' or 'grid'
@@ -502,24 +501,16 @@ function App() {
                     <SlidersHorizontal className="w-4 h-4" />
                     Artwork Size: {thumbnailSize}px
                   </label>
-                  <button
-                    onClick={() => setShowSizeSlider(!showSizeSlider)}
-                    className={`text-xs px-3 py-1 rounded-md ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-purple-200 hover:bg-purple-300 text-purple-800'} transition-colors`}
-                  >
-                    {showSizeSlider ? 'Hide' : 'Show'} Slider
-                  </button>
                 </div>
-                {showSizeSlider && (
-                  <input
-                    type="range"
-                    min="150"
-                    max="500"
-                    step="1"
-                    value={thumbnailSize}
-                    onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
-                    className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
-                  />
-                )}
+                <input
+                  type="range"
+                  min="150"
+                  max="500"
+                  step="1"
+                  value={thumbnailSize}
+                  onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
+                />
               </div>
             )}
 
