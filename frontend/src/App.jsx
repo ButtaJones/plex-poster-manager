@@ -328,7 +328,7 @@ function App() {
                 disabled={librariesLoading || libraries.length === 0}
               >
                 {librariesLoading ? (
-                  <option value="">Loading libraries...</option>
+                  <option value="">Loading libraries... ⏳</option>
                 ) : libraries.length === 0 ? (
                   <option value="">No libraries found</option>
                 ) : (
