@@ -8,6 +8,7 @@ import ConfigModal from './components/ConfigModal';
 import ItemCard from './components/ItemCard';
 import Pagination from './components/Pagination';
 import { configAPI, libraryAPI, artworkAPI, operationsAPI } from './api';
+import { saveScanResults, loadScanResults, clearScanResults } from './utils/indexedDB';
 
 function App() {
   const [config, setConfig] = useState(null);
@@ -105,25 +106,66 @@ function App() {
     localStorage.setItem('libraryThumbnailSize', libraryThumbnailSize.toString());
   }, [libraryThumbnailSize]);
 
-  // Save scan results to localStorage for persistence across page refreshes
-  // NOTE: We only save metadata, not the full item data (too large for localStorage)
+  // Load scan results from IndexedDB on component mount
+  useEffect(() => {
+    const loadSavedResults = async () => {
+      try {
+        const savedData = await loadScanResults();
+        if (savedData && savedData.allItems && savedData.allItems.length > 0) {
+          console.log('[App] Restoring scan results from IndexedDB');
+          setAllItems(savedData.allItems);
+          setTotalCount(savedData.totalCount || savedData.allItems.length);
+          setCurrentPage(savedData.currentPage || 1);
+          setScanLimit(savedData.scanLimit || 25);
+          setSelectedLibrary(savedData.selectedLibrary || 'TV Shows');
+
+          // Set initial page items
+          const limit = savedData.scanLimit || 25;
+          const pageItems = savedData.allItems.slice(0, limit);
+          setItems(pageItems);
+
+          console.log(`[App] Restored ${savedData.allItems.length} items from IndexedDB`);
+        }
+      } catch (error) {
+        console.error('[App] Failed to load scan results:', error);
+      }
+    };
+
+    loadSavedResults();
+  }, []); // Only run on mount
+
+  // Save scan results to IndexedDB for persistence across page refreshes
+  // IndexedDB has much higher storage limits (50MB-100MB+) than localStorage (5-10MB)
   useEffect(() => {
     if (allItems.length > 0) {
       const scanResults = {
+        allItems,
         selectedLibrary,
         totalCount,
         currentPage,
-        scanLimit,
-        itemCount: allItems.length // Just save the count, not all items
+        scanLimit
       };
+
+      // Save to IndexedDB (async, non-blocking)
+      saveScanResults(scanResults).catch(error => {
+        console.error('[App] Failed to save scan results:', error);
+      });
+
+      // Also save minimal metadata to localStorage for fallback
       try {
-        localStorage.setItem('scanResults', JSON.stringify(scanResults));
+        const metadata = {
+          selectedLibrary,
+          totalCount,
+          currentPage,
+          scanLimit,
+          itemCount: allItems.length
+        };
+        localStorage.setItem('scanResults', JSON.stringify(metadata));
       } catch (e) {
-        // Quota exceeded - just skip saving
-        console.warn('localStorage quota exceeded, skipping scan results save');
+        console.warn('[App] localStorage quota exceeded, skipping metadata save');
       }
     }
-  }, [selectedLibrary, totalCount, currentPage, allItems.length, scanLimit]);
+  }, [allItems, selectedLibrary, totalCount, currentPage, scanLimit]);
 
   const loadLibraries = useCallback(async () => {
     setLibrariesLoading(true);
@@ -199,6 +241,7 @@ function App() {
     setAllItems([]);
     setTotalCount(0);
     localStorage.removeItem('scanResults');
+    clearScanResults().catch(err => console.error('[App] Failed to clear IndexedDB:', err));
 
     setLoading(true);
     setCurrentPage(1);
