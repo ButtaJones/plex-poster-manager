@@ -79,20 +79,29 @@ class PlexScannerAPI:
             print(f"[PlexScannerAPI] ERROR: Connection failed - {e}")
             return False
 
-    def get_libraries(self) -> List[str]:
+    def get_libraries(self) -> List[Dict]:
         """
-        Get list of available library names.
+        Get list of available libraries with item counts.
 
         Returns:
-            List of library section names
+            List of dicts with 'name' and 'count' keys
         """
         if not self.plex:
             if not self.connect():
                 return []
 
         try:
-            libraries = [section.title for section in self.plex.library.sections()]
-            print(f"\n[get_libraries] Found {len(libraries)} libraries: {libraries}")
+            libraries = []
+            for section in self.plex.library.sections():
+                # Get total item count for this library
+                item_count = len(section.all())
+                libraries.append({
+                    'name': section.title,
+                    'count': item_count
+                })
+                print(f"[get_libraries] {section.title}: {item_count} items")
+
+            print(f"\n[get_libraries] Found {len(libraries)} libraries")
             return libraries
         except Exception as e:
             print(f"[get_libraries] ERROR: {e}")

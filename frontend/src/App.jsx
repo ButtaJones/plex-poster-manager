@@ -317,17 +317,26 @@ function App() {
               <select
                 value={selectedLibrary}
                 onChange={(e) => setSelectedLibrary(e.target.value)}
-                className={`w-full px-4 py-2.5 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                className={`w-full h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
                 disabled={libraries.length === 0}
               >
                 {libraries.length === 0 ? (
                   <option value="">No libraries found</option>
                 ) : (
-                  libraries.map((lib) => (
-                    <option key={lib} value={lib}>
-                      {lib}
-                    </option>
-                  ))
+                  libraries.map((lib) => {
+                    // Handle both old format (string) and new format (object with name/count)
+                    const libName = typeof lib === 'string' ? lib : lib.name;
+                    const libCount = typeof lib === 'object' && lib.count !== undefined ? lib.count : null;
+                    const displayText = libCount !== null
+                      ? `${libName} (${libCount.toLocaleString()} items)`
+                      : libName;
+
+                    return (
+                      <option key={libName} value={libName}>
+                        {displayText}
+                      </option>
+                    );
+                  })
                 )}
               </select>
             </div>
@@ -341,7 +350,7 @@ function App() {
               <select
                 value={scanLimit || ''}
                 onChange={(e) => setScanLimit(e.target.value ? parseInt(e.target.value) : null)}
-                className={`w-full px-4 py-2.5 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                className={`w-full h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
               >
                 <option value="">All Items</option>
                 <option value="25">25 items</option>
@@ -364,11 +373,11 @@ function App() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Search by title..."
-                  className={`flex-1 px-4 py-2.5 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  className={`flex-1 h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
                 />
                 <button
                   onClick={handleSearch}
-                  className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-800'} text-white`}
+                  className={`h-11 px-4 rounded-lg font-medium transition-all flex items-center gap-2 ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-800'} text-white`}
                 >
                   <Search className="w-4 h-4" />
                   <span className="hidden sm:inline">Search</span>
@@ -382,7 +391,7 @@ function App() {
               <button
                 onClick={handleScan}
                 disabled={loading}
-                className={`w-full px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`w-full h-11 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 {loading ? 'Scanning...' : 'Scan Library'}
@@ -416,32 +425,34 @@ function App() {
               </div>
             </div>
 
-            {/* Artwork Thumbnail Size Slider */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                  <SlidersHorizontal className="w-4 h-4" />
-                  Artwork Size: {thumbnailSize}px
-                </label>
-                <button
-                  onClick={() => setShowSizeSlider(!showSizeSlider)}
-                  className={`text-xs px-3 py-1 rounded-md ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-purple-200 hover:bg-purple-300 text-purple-800'} transition-colors`}
-                >
-                  {showSizeSlider ? 'Hide' : 'Show'} Slider
-                </button>
+            {/* Artwork Thumbnail Size Slider (List View Only) */}
+            {viewMode === 'list' && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Artwork Size: {thumbnailSize}px
+                  </label>
+                  <button
+                    onClick={() => setShowSizeSlider(!showSizeSlider)}
+                    className={`text-xs px-3 py-1 rounded-md ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-purple-200 hover:bg-purple-300 text-purple-800'} transition-colors`}
+                  >
+                    {showSizeSlider ? 'Hide' : 'Show'} Slider
+                  </button>
+                </div>
+                {showSizeSlider && (
+                  <input
+                    type="range"
+                    min="150"
+                    max="500"
+                    step="1"
+                    value={thumbnailSize}
+                    onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
+                  />
+                )}
               </div>
-              {showSizeSlider && (
-                <input
-                  type="range"
-                  min="150"
-                  max="500"
-                  step="1"
-                  value={thumbnailSize}
-                  onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
-                  className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
-                />
-              )}
-            </div>
+            )}
 
             {/* Library Thumbnail Size Slider (only in grid mode) */}
             {viewMode === 'grid' && (
@@ -646,24 +657,32 @@ function App() {
                       }}
                     >
                       {/* Show first poster/artwork as thumbnail */}
-                      {item.artwork && item.artwork.length > 0 ? (
-                        <img
-                          src={item.artwork[0].thumbnail_url}
-                          alt={item.info.title}
-                          className="w-full aspect-[2/3] object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className={`w-full aspect-[2/3] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                          <Image className={`w-12 h-12 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-                        </div>
-                      )}
+                      {(() => {
+                        // Get first available poster (try posters, then art, then backgrounds, then banners)
+                        const firstPoster = item.artwork?.posters?.[0] ||
+                                          item.artwork?.art?.[0] ||
+                                          item.artwork?.backgrounds?.[0] ||
+                                          item.artwork?.banners?.[0];
+
+                        return firstPoster ? (
+                          <img
+                            src={firstPoster.thumbnail_url}
+                            alt={item.info.title}
+                            className="w-full aspect-[2/3] object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className={`w-full aspect-[2/3] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                            <Image className={`w-12 h-12 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                          </div>
+                        );
+                      })()}
                       <div className="p-3">
                         <h3 className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                           {item.info.title}
                         </h3>
                         <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {item.artwork?.length || 0} artwork files
+                          {item.total_artwork || 0} artwork files
                         </p>
                       </div>
                     </div>
