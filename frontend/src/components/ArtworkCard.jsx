@@ -9,18 +9,11 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
     return `${apiBaseUrl}/api/thumbnail?url=${encodeURIComponent(thumbUrl)}`;
   };
 
-  // Calculate display size (fixed height based on thumbnail size setting)
-  // Height is set, width auto-adjusts to maintain poster aspect ratio
-  const imageHeight = thumbnailSize * 1.5; // 2:3 aspect ratio (poster height = width * 1.5)
-
+  // Calculate display size based on thumbnail size setting
+  // Width is controlled by thumbnailSize, height uses aspect-ratio for proper poster proportions
   const cardStyle = {
-    maxWidth: `${thumbnailSize}px`,
+    width: `${thumbnailSize}px`,
     margin: '0 auto' // Center cards in their grid cells
-  };
-
-  const imageStyle = {
-    height: `${imageHeight}px`,
-    width: '100%'
   };
 
   const getProviderBadgeColor = (provider) => {
@@ -91,7 +84,7 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
       )}
 
       {/* Thumbnail */}
-      <div style={imageStyle} className="bg-gray-200 relative group cursor-pointer overflow-hidden">
+      <div className="aspect-[2/3] bg-gray-200 relative group cursor-pointer overflow-hidden">
         <img
           src={getThumbnailUrl(artwork.thumb_url)}
           alt={`${artwork.type} - ${artwork.provider}`}

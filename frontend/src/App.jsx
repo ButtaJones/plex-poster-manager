@@ -44,6 +44,7 @@ function App() {
     const saved = localStorage.getItem('libraryThumbnailSize');
     return saved ? parseInt(saved) : 200;
   });
+  const [expandedGridItems, setExpandedGridItems] = useState(new Set()); // Track which grid items are expanded
 
   // Save dark mode preference
   useEffect(() => {
@@ -644,55 +645,80 @@ function App() {
                     gridTemplateColumns: `repeat(auto-fill, minmax(${libraryThumbnailSize}px, 1fr))`
                   }}
                 >
-                  {items.map((item, index) => (
+                  {items.map((item, index) => {
+                    const isExpanded = expandedGridItems.has(index);
+                    const gridSpan = isExpanded ? 'col-span-full' : '';
+
+                    return (
                     <div
                       key={index}
-                      className={`rounded-xl overflow-hidden shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}
-                      onClick={() => {
-                        // Expand this item in list view
-                        setViewMode('list');
-                        // Scroll to this item after a brief delay for mode change
-                        setTimeout(() => {
-                          const element = document.getElementById(`item-${index}`);
-                          element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }, 100);
-                      }}
-                      style={{
+                      className={`rounded-xl overflow-hidden shadow-lg transition-all duration-200 ${!isExpanded ? 'hover:scale-105' : ''} ${gridSpan} ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}
+                      style={!isExpanded ? {
                         width: `${libraryThumbnailSize}px`,
-                        justifySelf: 'center'
-                      }}
+                        justifySelf: 'center',
+                        cursor: 'pointer'
+                      } : undefined}
                     >
-                      {/* Show first poster/artwork as thumbnail */}
-                      {(() => {
-                        // Get first available poster (try posters, then art, then backgrounds, then banners)
-                        const firstPoster = item.artwork?.posters?.[0] ||
-                                          item.artwork?.art?.[0] ||
-                                          item.artwork?.backgrounds?.[0] ||
-                                          item.artwork?.banners?.[0];
+                      {isExpanded ? (
+                        // Expanded view - show full ItemCard
+                        <ItemCard
+                          item={item}
+                          selectedArtwork={selectedArtwork}
+                          onSelectArtwork={handleSelectArtwork}
+                          onDeleteArtwork={handleDeleteArtwork}
+                          thumbnailSize={thumbnailSize}
+                          darkMode={darkMode}
+                          initiallyExpanded={true}
+                          onCollapse={() => {
+                            const newExpanded = new Set(expandedGridItems);
+                            newExpanded.delete(index);
+                            setExpandedGridItems(newExpanded);
+                          }}
+                        />
+                      ) : (
+                        // Collapsed view - show thumbnail card
+                        <div
+                          onClick={() => {
+                            const newExpanded = new Set(expandedGridItems);
+                            newExpanded.add(index);
+                            setExpandedGridItems(newExpanded);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {/* Show first poster/artwork as thumbnail */}
+                          {(() => {
+                            // Get first available poster (try posters, then art, then backgrounds, then banners)
+                            const firstPoster = item.artwork?.posters?.[0] ||
+                                              item.artwork?.art?.[0] ||
+                                              item.artwork?.backgrounds?.[0] ||
+                                              item.artwork?.banners?.[0];
 
-                        return firstPoster ? (
-                          <img
-                            src={firstPoster.thumb_url}
-                            alt={item.info.title}
-                            className="w-full aspect-[2/3] object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className={`w-full aspect-[2/3] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                            <Image className={`w-12 h-12 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                            return firstPoster ? (
+                              <img
+                                src={firstPoster.thumb_url}
+                                alt={item.info.title}
+                                className="w-full aspect-[2/3] object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className={`w-full aspect-[2/3] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                                <Image className={`w-12 h-12 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                              </div>
+                            );
+                          })()}
+                          <div className="p-3">
+                            <h3 className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                              {item.info.title}
+                            </h3>
+                            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {item.total_artwork || 0} artwork files
+                            </p>
                           </div>
-                        );
-                      })()}
-                      <div className="p-3">
-                        <h3 className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                          {item.info.title}
-                        </h3>
-                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {item.total_artwork || 0} artwork files
-                        </p>
-                      </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

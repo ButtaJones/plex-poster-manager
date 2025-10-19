@@ -1,11 +1,20 @@
 import React from 'react';
 import ArtworkCard from './ArtworkCard';
 
-const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300, darkMode = false }) => {
-  const [expanded, setExpanded] = React.useState(false);
+const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300, darkMode = false, initiallyExpanded = false, onCollapse }) => {
+  const [expanded, setExpanded] = React.useState(initiallyExpanded);
   const [activeTab, setActiveTab] = React.useState('posters');
 
-  const { info, artwork, total_artwork } = item;
+  const { info, artwork, total_artwork} = item;
+
+  // Handle toggle - if onCollapse is provided and we're collapsing, call it
+  const handleToggle = () => {
+    if (expanded && onCollapse) {
+      onCollapse();
+    } else {
+      setExpanded(!expanded);
+    }
+  };
 
   // Determine grid columns based on thumbnail size
   const getGridCols = () => {
@@ -37,7 +46,7 @@ const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thu
             ? 'bg-gray-900 hover:bg-gray-700'
             : 'bg-gray-50 hover:bg-gray-100'
         }`}
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
       >
         <div className="flex items-center justify-between">
           <div className="flex-1">
