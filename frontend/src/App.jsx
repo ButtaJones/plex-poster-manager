@@ -68,7 +68,7 @@ function App() {
     }
     return 200;
   });
-  const [expandedGridItems, setExpandedGridItems] = useState(new Set()); // Track which grid items are expanded
+  const [expandedItems, setExpandedItems] = useState(new Set()); // Track which items are expanded (by rating_key)
 
   // Save dark mode preference
   useEffect(() => {
@@ -410,7 +410,15 @@ function App() {
               </label>
               <select
                 value={scanLimit || ''}
-                onChange={(e) => setScanLimit(e.target.value ? parseInt(e.target.value) : null)}
+                onChange={(e) => {
+                  const newLimit = e.target.value ? parseInt(e.target.value) : null;
+                  setScanLimit(newLimit);
+                  // Reset to page 1 and recalculate items when limit changes
+                  setCurrentPage(1);
+                  if (newLimit && allItems.length > 0) {
+                    setItems(allItems.slice(0, newLimit));
+                  }
+                }}
                 className={`w-full h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
               >
                 <option value="">All Items</option>
@@ -686,17 +694,32 @@ function App() {
               {/* List View */}
               {viewMode === 'list' && (
                 <div className="space-y-4">
-                  {items.map((item, index) => (
-                    <ItemCard
-                      key={index}
-                      item={item}
-                      selectedArtwork={selectedArtwork}
-                      onSelectArtwork={handleSelectArtwork}
-                      onDeleteArtwork={handleDeleteArtwork}
-                      thumbnailSize={thumbnailSize}
-                      darkMode={darkMode}
-                    />
-                  ))}
+                  {items.map((item, index) => {
+                    const itemId = item.info.rating_key;
+                    const isExpanded = expandedItems.has(itemId);
+
+                    return (
+                      <ItemCard
+                        key={itemId || index}
+                        item={item}
+                        selectedArtwork={selectedArtwork}
+                        onSelectArtwork={handleSelectArtwork}
+                        onDeleteArtwork={handleDeleteArtwork}
+                        thumbnailSize={thumbnailSize}
+                        darkMode={darkMode}
+                        initiallyExpanded={isExpanded}
+                        onToggle={() => {
+                          const newExpanded = new Set(expandedItems);
+                          if (isExpanded) {
+                            newExpanded.delete(itemId);
+                          } else {
+                            newExpanded.add(itemId);
+                          }
+                          setExpandedItems(newExpanded);
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               )}
 
@@ -709,12 +732,13 @@ function App() {
                   }}
                 >
                   {items.map((item, index) => {
-                    const isExpanded = expandedGridItems.has(index);
+                    const itemId = item.info.rating_key;
+                    const isExpanded = expandedItems.has(itemId);
                     const gridSpan = isExpanded ? 'col-span-full' : '';
 
                     return (
                     <div
-                      key={index}
+                      key={itemId || index}
                       className={`rounded-xl overflow-hidden shadow-lg transition-all duration-200 ${!isExpanded ? 'hover:scale-105' : ''} ${gridSpan} ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}
                       style={!isExpanded ? {
                         width: `${libraryThumbnailSize}px`,
@@ -733,18 +757,18 @@ function App() {
                           darkMode={darkMode}
                           initiallyExpanded={true}
                           onCollapse={() => {
-                            const newExpanded = new Set(expandedGridItems);
-                            newExpanded.delete(index);
-                            setExpandedGridItems(newExpanded);
+                            const newExpanded = new Set(expandedItems);
+                            newExpanded.delete(itemId);
+                            setExpandedItems(newExpanded);
                           }}
                         />
                       ) : (
                         // Collapsed view - show thumbnail card
                         <div
                           onClick={() => {
-                            const newExpanded = new Set(expandedGridItems);
-                            newExpanded.add(index);
-                            setExpandedGridItems(newExpanded);
+                            const newExpanded = new Set(expandedItems);
+                            newExpanded.add(itemId);
+                            setExpandedItems(newExpanded);
                           }}
                           style={{ cursor: 'pointer' }}
                         >

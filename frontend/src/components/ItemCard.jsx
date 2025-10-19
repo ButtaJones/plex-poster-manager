@@ -1,15 +1,22 @@
 import React from 'react';
 import ArtworkCard from './ArtworkCard';
 
-const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300, darkMode = false, initiallyExpanded = false, onCollapse }) => {
+const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300, darkMode = false, initiallyExpanded = false, onCollapse, onToggle }) => {
   const [expanded, setExpanded] = React.useState(initiallyExpanded);
   const [activeTab, setActiveTab] = React.useState('posters');
 
   const { info, artwork, total_artwork} = item;
 
-  // Handle toggle - if onCollapse is provided and we're collapsing, call it
+  // Sync expanded state with prop changes
+  React.useEffect(() => {
+    setExpanded(initiallyExpanded);
+  }, [initiallyExpanded]);
+
+  // Handle toggle - use parent's onToggle if provided, otherwise manage locally
   const handleToggle = () => {
-    if (expanded && onCollapse) {
+    if (onToggle) {
+      onToggle();
+    } else if (expanded && onCollapse) {
       onCollapse();
     } else {
       setExpanded(!expanded);
