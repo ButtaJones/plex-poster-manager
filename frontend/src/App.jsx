@@ -184,10 +184,16 @@ function App() {
     }, 500);
 
     try {
-      // Scan ALL items (no limit) and cache them for client-side pagination
-      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit, 0);
+      // Scan a larger batch for caching (10x the page size, or 250 items minimum)
+      // This gives us enough items for multiple pages without scanning everything
+      const batchSize = scanLimit ? Math.max(scanLimit * 10, 250) : null;
+      const response = await libraryAPI.scanLibrary(selectedLibrary, batchSize, 0);
       const scannedItems = response.data.items;
       const totalItems = response.data.stats.total_count || 0;
+
+      console.log('[handleScan] Scanned items:', scannedItems.length);
+      console.log('[handleScan] Total items:', totalItems);
+      console.log('[handleScan] Batch size:', batchSize);
 
       // Cache all scanned items
       setAllItems(scannedItems);
@@ -196,6 +202,7 @@ function App() {
 
       // Show first page from cached data
       const firstPageItems = scanLimit ? scannedItems.slice(0, scanLimit) : scannedItems;
+      console.log('[handleScan] Showing first page:', firstPageItems.length, 'items');
       setItems(firstPageItems);
 
       clearInterval(progressInterval);
@@ -229,7 +236,14 @@ function App() {
   };
 
   const handlePageChange = (newPage) => {
-    if (!scanLimit || allItems.length === 0) return;
+    console.log('[handlePageChange] Page:', newPage);
+    console.log('[handlePageChange] scanLimit:', scanLimit);
+    console.log('[handlePageChange] allItems.length:', allItems.length);
+
+    if (!scanLimit || allItems.length === 0) {
+      console.log('[handlePageChange] BLOCKED: scanLimit or allItems empty');
+      return;
+    }
 
     // Scroll to top of page
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -238,8 +252,11 @@ function App() {
     const startIdx = (newPage - 1) * scanLimit;
     const endIdx = startIdx + scanLimit;
 
+    console.log('[handlePageChange] Slice range:', startIdx, '-', endIdx);
+
     // Slice from cached items (no API call needed!)
     const pageItems = allItems.slice(startIdx, endIdx);
+    console.log('[handlePageChange] Page items:', pageItems.length);
     setItems(pageItems);
     setCurrentPage(newPage);
   };
