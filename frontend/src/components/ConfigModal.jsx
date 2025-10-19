@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
+const ConfigModal = ({ isOpen, onClose, config, onSave, darkMode = false }) => {
   const [formData, setFormData] = useState({
     plex_url: config?.plex_url || 'http://localhost:32400',
     plex_token: config?.plex_token || '',
@@ -65,20 +65,34 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
-        <div className="p-6 border-b">
-          <h2 className="text-2xl font-bold text-gray-800">Configuration</h2>
+      <div className={`rounded-lg shadow-xl max-w-2xl w-full mx-4 ${
+        darkMode ? 'bg-gray-800' : 'bg-white'
+      }`}>
+        <div className={`p-6 border-b ${
+          darkMode ? 'border-gray-700' : 'border-gray-200'
+        }`}>
+          <h2 className={`text-2xl font-bold ${
+            darkMode ? 'text-gray-100' : 'text-gray-800'
+          }`}>Configuration</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-            <p className="text-sm text-blue-800">
+          <div className={`border rounded-md p-3 mb-4 ${
+            darkMode
+              ? 'bg-blue-900 border-blue-700'
+              : 'bg-blue-50 border-blue-200'
+          }`}>
+            <p className={`text-sm ${
+              darkMode ? 'text-blue-200' : 'text-blue-800'
+            }`}>
               <strong>API Mode:</strong> This app uses the Plex API to manage artwork. You need a Plex server URL and authentication token.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${
+              darkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>
               Plex Server URL
             </label>
             <div className="flex gap-2">
@@ -88,7 +102,11 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, plex_url: e.target.value })
                 }
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                  darkMode
+                    ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'
+                }`}
                 placeholder="http://localhost:32400"
                 required
               />
@@ -101,13 +119,17 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
                 {detecting ? 'Detecting...' : 'Auto-Detect'}
               </button>
             </div>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className={`mt-1 text-sm ${
+              darkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               Usually http://localhost:32400 for local servers
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${
+              darkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>
               Plex Token (Required)
             </label>
             <div className="flex gap-2">
@@ -117,7 +139,11 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, plex_token: e.target.value })
                 }
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 font-mono text-sm ${
+                  darkMode
+                    ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'
+                }`}
                 placeholder="Your Plex authentication token"
                 required
               />
@@ -130,14 +156,18 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
                 {testing ? 'Testing...' : 'Test'}
               </button>
             </div>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className={`mt-1 text-sm ${
+              darkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               Get your token from Plex Settings → Network → Show Advanced → Manual Connections
-              {' '}(<a href="https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">How to find</a>)
+              {' '}(<a href="https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/" target="_blank" rel="noopener noreferrer" className={darkMode ? 'text-blue-400 hover:underline' : 'text-blue-600 hover:underline'}>How to find</a>)
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${
+              darkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>
               Backup Directory (Optional)
             </label>
             <input
@@ -146,16 +176,24 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
               onChange={(e) =>
                 setFormData({ ...formData, backup_directory: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                darkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
+                  : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'
+              }`}
               placeholder="/path/to/backups"
             />
-            <p className="mt-1 text-sm text-gray-500">
+            <p className={`mt-1 text-sm ${
+              darkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               Where deleted artwork will be backed up
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${
+              darkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>
               Thumbnail Size: {formData.thumbnail_size[0]}x{formData.thumbnail_size[1]}px
             </label>
             <input
@@ -169,14 +207,22 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
                 const height = Math.round(width * 1.5); // 2:3 aspect ratio
                 setFormData({ ...formData, thumbnail_size: [width, height] });
               }}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                darkMode
+                  ? 'bg-gray-700 accent-blue-400'
+                  : 'bg-gray-200 accent-blue-600'
+              }`}
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className={`flex justify-between text-xs mt-1 ${
+              darkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               <span>Small (150px)</span>
               <span>Medium (300px)</span>
               <span>Large (600px)</span>
             </div>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className={`mt-1 text-sm ${
+              darkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               Adjust thumbnail display size (larger = better quality, slower loading)
             </p>
           </div>
@@ -185,7 +231,11 @@ const ConfigModal = ({ isOpen, onClose, config, onSave }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+              className={`px-4 py-2 rounded-md ${
+                darkMode
+                  ? 'text-gray-300 bg-gray-700 hover:bg-gray-600'
+                  : 'text-gray-700 bg-gray-200 hover:bg-gray-300'
+              }`}
             >
               Cancel
             </button>

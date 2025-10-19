@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailSize = 300 }) => {
+const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailSize = 300, darkMode = false }) => {
   const getThumbnailUrl = (thumbUrl) => {
     // Auto-detect API base URL from environment or construct from current host
     // This allows the app to work both on localhost and over the network
@@ -44,8 +44,12 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
       style={cardStyle}
       className={`relative border rounded-lg overflow-hidden transition-all ${
         isSelected
-          ? 'ring-4 ring-blue-500 border-blue-500'
-          : 'border-gray-300 hover:border-gray-400'
+          ? darkMode
+            ? 'ring-4 ring-blue-400 border-blue-400'
+            : 'ring-4 ring-blue-500 border-blue-500'
+          : darkMode
+            ? 'border-gray-700 hover:border-gray-600'
+            : 'border-gray-300 hover:border-gray-400'
       }`}
     >
       {/* Selection Checkbox */}
@@ -100,13 +104,19 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
       </div>
 
       {/* Info */}
-      <div className="p-3 bg-white">
-        <p className="text-xs text-gray-600 mb-1 capitalize">
+      <div className={`p-3 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+        <p className={`text-xs mb-1 capitalize ${
+          darkMode ? 'text-gray-400' : 'text-gray-600'
+        }`}>
           {artwork.type}
         </p>
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className={`flex justify-between text-xs ${
+          darkMode ? 'text-gray-500' : 'text-gray-500'
+        }`}>
           <span>{getProviderName(artwork.provider)}</span>
-          {artwork.selected && <span className="text-green-600 font-semibold">Active</span>}
+          {artwork.selected && <span className={`font-semibold ${
+            darkMode ? 'text-green-400' : 'text-green-600'
+          }`}>Active</span>}
         </div>
       </div>
     </div>

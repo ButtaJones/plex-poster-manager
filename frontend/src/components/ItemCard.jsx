@@ -1,7 +1,7 @@
 import React from 'react';
 import ArtworkCard from './ArtworkCard';
 
-const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300 }) => {
+const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300, darkMode = false }) => {
   const [expanded, setExpanded] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('posters');
 
@@ -25,35 +25,51 @@ const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thu
   const currentArtwork = artwork[activeTab] || [];
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+    <div className={`border rounded-lg overflow-hidden shadow-sm ${
+      darkMode
+        ? 'border-gray-700 bg-gray-800'
+        : 'border-gray-300 bg-white'
+    }`}>
       {/* Header */}
       <div
-        className="p-4 bg-gray-50 border-b cursor-pointer hover:bg-gray-100 transition-colors"
+        className={`p-4 border-b cursor-pointer transition-colors ${
+          darkMode
+            ? 'bg-gray-900 hover:bg-gray-700'
+            : 'bg-gray-50 hover:bg-gray-100'
+        }`}
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-800">
+            <h3 className={`text-lg font-semibold ${
+              darkMode ? 'text-gray-100' : 'text-gray-800'
+            }`}>
               {info.title}
               {info.parent_title && (
-                <span className="text-sm text-gray-600 ml-2">
+                <span className={`text-sm ml-2 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
                   ({info.parent_title})
                 </span>
               )}
             </h3>
-            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+            <div className={`flex items-center gap-4 mt-1 text-sm ${
+              darkMode ? 'text-gray-400' : 'text-gray-600'
+            }`}>
               <span>Type: {info.type}</span>
               {info.year && <span>Year: {info.year}</span>}
-              <span className="font-medium text-blue-600">
+              <span className={`font-medium ${
+                darkMode ? 'text-blue-400' : 'text-blue-600'
+              }`}>
                 {total_artwork} artwork file{total_artwork !== 1 ? 's' : ''}
               </span>
             </div>
           </div>
           <div className="ml-4">
             <svg
-              className={`w-6 h-6 text-gray-600 transition-transform ${
-                expanded ? 'rotate-180' : ''
-              }`}
+              className={`w-6 h-6 transition-transform ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              } ${expanded ? 'rotate-180' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -80,8 +96,12 @@ const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thu
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-2 font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? darkMode
+                      ? 'text-blue-400 border-b-2 border-blue-400'
+                      : 'text-blue-600 border-b-2 border-blue-600'
+                    : darkMode
+                      ? 'text-gray-400 hover:text-gray-200'
+                      : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
                 {tab.label} ({tab.count})
@@ -101,11 +121,14 @@ const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thu
                   onSelect={onSelectArtwork}
                   onDelete={onDeleteArtwork}
                   thumbnailSize={thumbnailSize}
+                  darkMode={darkMode}
                 />
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
+            <p className={`text-center py-8 ${
+              darkMode ? 'text-gray-500' : 'text-gray-500'
+            }`}>
               No {activeTab} found for this item.
             </p>
           )}

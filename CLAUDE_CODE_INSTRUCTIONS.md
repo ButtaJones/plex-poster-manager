@@ -27,21 +27,35 @@ When user reports a UI issue (e.g., "0 results showing", "button doesn't work"):
 - Chromium 141+ requires macOS 12+ (LocalAuthenticationEmbeddedUI.framework)
 - **Solution**: Use Firefox instead of Chromium on Big Sur
 
+**IMPORTANT: Headless Mode Guidelines**
+- **Default: Use headless=True** - Don't interfere with user's workspace
+- **Only use headless=False when:** Debugging tests or need to see browser interactions
+- Headless mode is faster and still captures screenshots perfectly
+
 ```python
 # Python Playwright (WORKS on Big Sur 11.7.4)
 from playwright.sync_api import sync_playwright
 
 with sync_playwright() as p:
     # Use Firefox for Big Sur compatibility
-    browser = p.firefox.launch(headless=False)
+    # headless=True by default (don't interrupt user's work)
+    browser = p.firefox.launch(headless=True)
     page = browser.new_page()
 
     # Your testing code here
     page.goto('http://localhost:3000')
-    # ...
+
+    # Screenshots work perfectly in headless mode
+    page.screenshot(path='screenshot.png')
 
     browser.close()
 ```
+
+**When to use headless=False:**
+- First time writing/debugging a new test
+- Need to visually verify browser behavior
+- User specifically requests to see the browser
+- Investigating why a test is failing
 
 ```javascript
 // JavaScript Playwright (if using Node.js)
