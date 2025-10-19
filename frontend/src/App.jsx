@@ -14,8 +14,30 @@ function App() {
   const [showConfig, setShowConfig] = useState(false);
   const [libraries, setLibraries] = useState([]);
   const [librariesLoading, setLibrariesLoading] = useState(true); // Start as true to show "Loading..." on initial render
-  const [selectedLibrary, setSelectedLibrary] = useState('TV Shows');
-  const [items, setItems] = useState([]);
+  const [selectedLibrary, setSelectedLibrary] = useState(() => {
+    const saved = localStorage.getItem('scanResults');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.selectedLibrary || 'TV Shows';
+      } catch (e) {
+        return 'TV Shows';
+      }
+    }
+    return 'TV Shows';
+  });
+  const [items, setItems] = useState(() => {
+    const saved = localStorage.getItem('scanResults');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.items || [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [selectedArtwork, setSelectedArtwork] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,9 +46,42 @@ function App() {
   const [showOperations, setShowOperations] = useState(false);
   const [scanProgress, setScanProgress] = useState(null);
   const [scanLimit, setScanLimit] = useState(25); // Default to 25 items
-  const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [allItems, setAllItems] = useState([]); // Cache all scanned items for pagination
+  const [totalCount, setTotalCount] = useState(() => {
+    const saved = localStorage.getItem('scanResults');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.totalCount || 0;
+      } catch (e) {
+        return 0;
+      }
+    }
+    return 0;
+  });
+  const [currentPage, setCurrentPage] = useState(() => {
+    const saved = localStorage.getItem('scanResults');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.currentPage || 1;
+      } catch (e) {
+        return 1;
+      }
+    }
+    return 1;
+  });
+  const [allItems, setAllItems] = useState(() => {
+    const saved = localStorage.getItem('scanResults');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.allItems || [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }); // Cache all scanned items for pagination
 
   // New UI state
   const [darkMode, setDarkMode] = useState(() => {
@@ -94,7 +149,19 @@ function App() {
     localStorage.setItem('libraryThumbnailSize', libraryThumbnailSize.toString());
   }, [libraryThumbnailSize]);
 
-  // Note: localStorage persistence removed - fresh start on each browser open
+  // Save scan results to localStorage for persistence across page refreshes
+  useEffect(() => {
+    if (allItems.length > 0) {
+      const scanResults = {
+        selectedLibrary,
+        items,
+        totalCount,
+        currentPage,
+        allItems
+      };
+      localStorage.setItem('scanResults', JSON.stringify(scanResults));
+    }
+  }, [selectedLibrary, items, totalCount, currentPage, allItems]);
 
   const loadLibraries = useCallback(async () => {
     setLibrariesLoading(true);
@@ -164,6 +231,12 @@ function App() {
 
   const handleScan = async () => {
     if (!selectedLibrary) return;
+
+    // Clear previous scan results when starting a new scan
+    setItems([]);
+    setAllItems([]);
+    setTotalCount(0);
+    localStorage.removeItem('scanResults');
 
     setLoading(true);
     setCurrentPage(1);
