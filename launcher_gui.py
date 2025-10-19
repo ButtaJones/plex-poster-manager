@@ -195,6 +195,10 @@ class PlexPosterManagerLauncher:
                                           command=self.open_browser, state="disabled")
         self.browser_button.pack(side="left", padx=5, fill="x", expand=True)
 
+        self.update_button = ttk.Button(control_frame, text="🔄 Check for Updates",
+                                         command=self.check_for_updates)
+        self.update_button.pack(side="left", padx=5, fill="x", expand=True)
+
         # --- Log Output Section ---
         log_frame = ttk.LabelFrame(main_frame, text="Server Output", padding="10")
         log_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(0, 10))
@@ -659,6 +663,155 @@ class PlexPosterManagerLauncher:
         if self.check_dependencies():
             self.log("\n🚀 Auto-starting servers (configured in settings)...\n")
             self.start_servers()
+
+    def check_for_updates(self):
+        """Check GitHub for latest release and offer to update."""
+        self.log("\n🔍 Checking for updates...")
+
+        try:
+            # Fetch latest release from GitHub API
+            url = "https://api.github.com/repos/ButtaJones/plex-poster-manager/releases/latest"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+
+            latest_release = response.json()
+            latest_version = latest_release.get('tag_name', 'unknown')
+            release_name = latest_release.get('name', latest_version)
+            release_body = latest_release.get('body', 'No changelog available.')
+            release_url = latest_release.get('html_url', '')
+
+            # Get current version from git (if available)
+            try:
+                current_version_result = subprocess.run(
+                    ["git", "describe", "--tags", "--abbrev=0"],
+                    cwd=str(PROJECT_ROOT),
+                    capture_output=True,
+                    text=True
+                )
+                current_version = current_version_result.stdout.strip() if current_version_result.returncode == 0 else "unknown"
+            except:
+                current_version = "unknown"
+
+            self.log(f"✓ Current version: {current_version}")
+            self.log(f"✓ Latest version: {latest_version}")
+
+            # Check if update is available
+            if current_version == latest_version:
+                self.log("✓ You're up to date!")
+                messagebox.showinfo(
+                    "No Updates Available",
+                    f"You're already running the latest version!\n\n"
+                    f"Current: {current_version}\n"
+                    f"Latest: {latest_version}"
+                )
+            else:
+                # Show update dialog with changelog
+                self.show_update_dialog(current_version, latest_version, release_name, release_body, release_url)
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"✗ Failed to check for updates: {e}")
+            messagebox.showerror(
+                "Update Check Failed",
+                f"Could not check for updates:\n\n{str(e)}\n\n"
+                "Please check your internet connection or try again later."
+            )
+        except Exception as e:
+            self.log(f"✗ Error checking for updates: {e}")
+            messagebox.showerror("Error", f"An error occurred:\n\n{str(e)}")
+
+    def show_update_dialog(self, current, latest, name, changelog, url):
+        """Show update available dialog with changelog."""
+        # Create custom dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Update Available")
+        dialog.geometry("600x500")
+        dialog.resizable(True, True)
+
+        # Title
+        title_label = ttk.Label(dialog, text=f"New Version Available: {latest}", font=("", 14, "bold"))
+        title_label.pack(pady=(20, 10))
+
+        subtitle_label = ttk.Label(dialog, text=f"Current version: {current}")
+        subtitle_label.pack(pady=(0, 20))
+
+        # Changelog frame
+        changelog_frame = ttk.LabelFrame(dialog, text="What's New", padding="10")
+        changelog_frame.pack(padx=20, pady=(0, 20), fill="both", expand=True)
+
+        changelog_text = scrolledtext.ScrolledText(changelog_frame, wrap=tk.WORD, height=15)
+        changelog_text.pack(fill="both", expand=True)
+        changelog_text.insert(1.0, changelog)
+        changelog_text.config(state="disabled")
+
+        # Buttons frame
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=(0, 20))
+
+        def update_now():
+            dialog.destroy()
+            self.perform_update(url)
+
+        def skip_version():
+            dialog.destroy()
+            self.log(f"ℹ Skipped version {latest}")
+
+        def remind_later():
+            dialog.destroy()
+            self.log("ℹ Update reminder dismissed")
+
+        update_btn = ttk.Button(button_frame, text="Update Now", command=update_now, style="Accent.TButton")
+        update_btn.pack(side="left", padx=5)
+
+        skip_btn = ttk.Button(button_frame, text="Skip This Version", command=skip_version)
+        skip_btn.pack(side="left", padx=5)
+
+        later_btn = ttk.Button(button_frame, text="Remind Me Later", command=remind_later)
+        later_btn.pack(side="left", padx=5)
+
+        # Center dialog
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+    def perform_update(self, release_url):
+        """Perform git pull to update the application."""
+        self.log("\n📥 Updating application...")
+
+        try:
+            # Check if git is available
+            result = subprocess.run(
+                ["git", "pull"],
+                cwd=str(PROJECT_ROOT),
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                self.log("✓ Update successful!")
+                self.log(result.stdout)
+
+                messagebox.showinfo(
+                    "Update Successful",
+                    "Application updated successfully!\n\n"
+                    "Please restart the launcher to use the new version.\n\n"
+                    "Don't forget to run 'npm install' in the frontend folder if there were dependency changes!"
+                )
+
+                # Trigger dependency check for new packages
+                self.check_dependencies()
+            else:
+                self.log(f"✗ Update failed: {result.stderr}")
+                messagebox.showerror(
+                    "Update Failed",
+                    f"Failed to update:\n\n{result.stderr}\n\n"
+                    f"You can manually update by visiting:\n{release_url}"
+                )
+        except Exception as e:
+            self.log(f"✗ Error updating: {e}")
+            messagebox.showerror(
+                "Update Error",
+                f"Could not update application:\n\n{str(e)}\n\n"
+                f"You can manually download the latest version from:\n{release_url}"
+            )
 
     def on_closing(self):
         """Handle window closing."""
