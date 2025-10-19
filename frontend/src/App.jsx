@@ -549,22 +549,22 @@ function App() {
               </div>
             )}
 
-            {/* Library Thumbnail Size Slider (only in grid mode) */}
+            {/* Artwork Thumbnail Size Slider (Grid View) */}
             {viewMode === 'grid' && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <label className={`text-sm font-semibold flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                    <LayoutGrid className="w-4 h-4" />
-                    Library Poster Size: {libraryThumbnailSize}px
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Artwork Size: {thumbnailSize}px
                   </label>
                 </div>
                 <input
                   type="range"
-                  min="100"
-                  max="400"
+                  min="150"
+                  max="500"
                   step="1"
-                  value={libraryThumbnailSize}
-                  onChange={(e) => setLibraryThumbnailSize(parseInt(e.target.value))}
+                  value={thumbnailSize}
+                  onChange={(e) => setThumbnailSize(parseInt(e.target.value))}
                   className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
                 />
               </div>
