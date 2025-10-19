@@ -318,6 +318,7 @@ class PlexPosterManagerLauncher:
         self.log("Checking dependencies...")
 
         needs_setup = []
+        needs_update = []
 
         # Check Python venv
         if not VENV_PYTHON.exists():
@@ -328,6 +329,23 @@ class PlexPosterManagerLauncher:
         if not (FRONTEND_DIR / "node_modules").exists():
             self.log("✗ Frontend dependencies not installed!")
             needs_setup.append("Frontend dependencies")
+        else:
+            # Check if package.json has newer dependencies than what's installed
+            # This catches cases like lucide-react being added after npm install
+            package_json = FRONTEND_DIR / "package.json"
+            if package_json.exists():
+                try:
+                    import json
+                    with open(package_json, 'r') as f:
+                        pkg_data = json.load(f)
+
+                    # Check if lucide-react (new in v2.1.0) is installed
+                    lucide_path = FRONTEND_DIR / "node_modules" / "lucide-react"
+                    if "lucide-react" in pkg_data.get("dependencies", {}) and not lucide_path.exists():
+                        self.log("⚠ New dependencies detected (lucide-react icons)")
+                        needs_update.append("Frontend dependencies (new packages)")
+                except Exception as e:
+                    self.log(f"  (Could not check package.json: {e})")
 
         if needs_setup:
             self.status_label.config(text="● Missing Dependencies", foreground="red")
@@ -349,7 +367,23 @@ class PlexPosterManagerLauncher:
                     self.log("  3. cd frontend && npm install")
                 return False
 
-        self.log("✓ All dependencies found")
+        if needs_update:
+            self.status_label.config(text="● Updates Available", foreground="orange")
+
+            # Offer automatic update
+            msg = "New dependencies detected:\n\n"
+            msg += "\n".join(f"  • {item}" for item in needs_update)
+            msg += "\n\nThis happens after pulling updates from GitHub."
+            msg += "\n\nWould you like to install them now? (takes ~30 seconds)"
+
+            if messagebox.askyesno("Update Dependencies", msg):
+                return self.update_frontend_dependencies()
+            else:
+                self.log("\n⚠ WARNING: App may not work without new dependencies!")
+                self.log("  Run manually: cd frontend && npm install")
+                return False
+
+        self.log("✓ All dependencies found and up to date")
         return True
 
     def run_first_time_setup(self):
@@ -433,6 +467,47 @@ class PlexPosterManagerLauncher:
             self.log(f"\n✗ Setup failed with error: {e}")
             messagebox.showerror("Setup Failed", f"An error occurred during setup:\n{e}")
             self.status_label.config(text="● Setup Failed", foreground="red")
+            return False
+
+    def update_frontend_dependencies(self):
+        """Update frontend dependencies (run npm install)."""
+        self.log("\n" + "=" * 60)
+        self.log("UPDATING FRONTEND DEPENDENCIES")
+        self.log("=" * 60)
+        self.log("\n📦 Installing new packages from package.json...")
+        self.status_label.config(text="● Installing packages...", foreground="orange")
+
+        try:
+            result = subprocess.run(
+                [NPM_CMD, "install"],
+                cwd=str(FRONTEND_DIR),
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                self.log(f"✗ Failed to install dependencies: {result.stderr}")
+                messagebox.showerror("Update Failed",
+                                   f"Failed to install dependencies:\n\n{result.stderr}")
+                self.status_label.config(text="● Update Failed", foreground="red")
+                return False
+
+            self.log("✓ Frontend dependencies updated successfully")
+            self.log("\n" + "=" * 60)
+            self.log("✓ UPDATE COMPLETE!")
+            self.log("=" * 60 + "\n")
+
+            self.status_label.config(text="● Ready", foreground="green")
+            messagebox.showinfo("Success",
+                              "Dependencies installed successfully!\n\n"
+                              "If servers are running, please restart them\n"
+                              "to use the new packages.")
+            return True
+
+        except Exception as e:
+            self.log(f"✗ Error updating dependencies: {e}")
+            messagebox.showerror("Error", f"Failed to update dependencies:\n\n{e}")
+            self.status_label.config(text="● Update Failed", foreground="red")
             return False
 
     def start_servers(self):
