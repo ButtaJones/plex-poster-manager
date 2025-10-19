@@ -26,18 +26,7 @@ function App() {
     }
     return 'TV Shows';
   });
-  const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem('scanResults');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.items || [];
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [items, setItems] = useState([]);
   const [selectedArtwork, setSelectedArtwork] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,42 +35,9 @@ function App() {
   const [showOperations, setShowOperations] = useState(false);
   const [scanProgress, setScanProgress] = useState(null);
   const [scanLimit, setScanLimit] = useState(25); // Default to 25 items
-  const [totalCount, setTotalCount] = useState(() => {
-    const saved = localStorage.getItem('scanResults');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.totalCount || 0;
-      } catch (e) {
-        return 0;
-      }
-    }
-    return 0;
-  });
-  const [currentPage, setCurrentPage] = useState(() => {
-    const saved = localStorage.getItem('scanResults');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.currentPage || 1;
-      } catch (e) {
-        return 1;
-      }
-    }
-    return 1;
-  });
-  const [allItems, setAllItems] = useState(() => {
-    const saved = localStorage.getItem('scanResults');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.allItems || [];
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  }); // Cache all scanned items for pagination
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [allItems, setAllItems] = useState([]); // Cache all scanned items for pagination
 
   // New UI state
   const [darkMode, setDarkMode] = useState(() => {
@@ -150,18 +106,24 @@ function App() {
   }, [libraryThumbnailSize]);
 
   // Save scan results to localStorage for persistence across page refreshes
+  // NOTE: We only save metadata, not the full item data (too large for localStorage)
   useEffect(() => {
     if (allItems.length > 0) {
       const scanResults = {
         selectedLibrary,
-        items,
         totalCount,
         currentPage,
-        allItems
+        scanLimit,
+        itemCount: allItems.length // Just save the count, not all items
       };
-      localStorage.setItem('scanResults', JSON.stringify(scanResults));
+      try {
+        localStorage.setItem('scanResults', JSON.stringify(scanResults));
+      } catch (e) {
+        // Quota exceeded - just skip saving
+        console.warn('localStorage quota exceeded, skipping scan results save');
+      }
     }
-  }, [selectedLibrary, items, totalCount, currentPage, allItems]);
+  }, [selectedLibrary, totalCount, currentPage, allItems.length, scanLimit]);
 
   const loadLibraries = useCallback(async () => {
     setLibrariesLoading(true);
