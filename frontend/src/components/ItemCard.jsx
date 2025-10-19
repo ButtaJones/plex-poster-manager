@@ -1,7 +1,7 @@
 import React from 'react';
 import ArtworkCard from './ArtworkCard';
 
-const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300, darkMode = false, initiallyExpanded = false, onCollapse, onToggle }) => {
+const ItemCard = React.memo(({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thumbnailSize = 300, darkMode = false, initiallyExpanded = false, onCollapse, onToggle }) => {
   const [expanded, setExpanded] = React.useState(initiallyExpanded);
   const [activeTab, setActiveTab] = React.useState('posters');
 
@@ -152,6 +152,6 @@ const ItemCard = ({ item, selectedArtwork, onSelectArtwork, onDeleteArtwork, thu
       )}
     </div>
   );
-};
+});
 
 export default ItemCard;

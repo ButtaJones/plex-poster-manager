@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailSize = 300, darkMode = false }) => {
+const ArtworkCard = React.memo(({ artwork, item, onSelect, isSelected, onDelete, thumbnailSize = 300, darkMode = false }) => {
   const [imageDimensions, setImageDimensions] = React.useState(null);
 
   const getThumbnailUrl = (thumbUrl) => {
@@ -141,6 +141,6 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
       </div>
     </div>
   );
-};
+});
 
 export default ArtworkCard;
