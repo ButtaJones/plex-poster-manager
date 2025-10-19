@@ -2,7 +2,11 @@ import React from 'react';
 
 const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailSize = 300 }) => {
   const getThumbnailUrl = (thumbUrl) => {
-    return `http://localhost:5000/api/thumbnail?url=${encodeURIComponent(thumbUrl)}`;
+    // Auto-detect API base URL from environment or construct from current host
+    // This allows the app to work both on localhost and over the network
+    const apiBaseUrl = process.env.REACT_APP_API_URL ||
+                       `${window.location.protocol}//${window.location.hostname}:5000`;
+    return `${apiBaseUrl}/api/thumbnail?url=${encodeURIComponent(thumbUrl)}`;
   };
 
   // Calculate display size (max-width based on thumbnail size setting)
