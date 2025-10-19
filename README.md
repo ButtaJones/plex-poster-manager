@@ -32,7 +32,7 @@ The launcher will detect that this is your first run and prompt:
 - The app will automatically:
   - ✅ Create Python virtual environment
   - ✅ Install all backend dependencies (including PlexAPI)
-  - ✅ Install all frontend dependencies
+  - ✅ Install all frontend dependencies (including lucide-react icons)
   - ⏱️ Takes 2-3 minutes
 
 ### 4. Configure and Launch
@@ -45,6 +45,31 @@ After setup completes:
 6. Click **"▶ Launch Servers"**
 
 **That's it!** Your app is ready to use. 🎉
+
+---
+
+## 🔄 Updating from GitHub (Existing Users)
+
+**If you've already installed the app and are pulling updates:**
+
+### After `git pull`:
+```bash
+# Update frontend dependencies (new in v2.1.0: lucide-react icons)
+cd frontend
+npm install
+
+# Update backend dependencies (if requirements.txt changed)
+cd ../backend
+pip install -r requirements.txt
+```
+
+**Why this is needed:**
+- Git only updates files, not installed packages
+- New dependencies (like `lucide-react`) won't work without `npm install`
+- This is standard practice for all npm/pip projects
+
+**Quick way to check if you need to update:**
+- If you see `Module not found: Error: Can't resolve 'lucide-react'` → Run `npm install` in frontend folder
 
 ---
 
