@@ -669,14 +669,14 @@ function App() {
           ) : items.length > 0 ? (
             <>
               {/* Top Pagination */}
-              {totalCount > 0 && scanLimit && (
+              {totalCount > 0 && scanLimit && allItems.length > 0 && (
                 <div className="mb-4">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={Math.ceil(totalCount / scanLimit)}
+                    totalPages={Math.ceil(allItems.length / scanLimit)}
                     totalCount={totalCount}
                     itemsPerPage={scanLimit}
-                    itemsShown={Math.min(currentPage * scanLimit, totalCount)}
+                    itemsShown={Math.min(currentPage * scanLimit, allItems.length)}
                     onPageChange={handlePageChange}
                     darkMode={darkMode}
                   />
@@ -786,14 +786,14 @@ function App() {
               )}
 
               {/* Bottom Pagination */}
-              {totalCount > 0 && scanLimit && (
+              {totalCount > 0 && scanLimit && allItems.length > 0 && (
                 <div className="mt-4">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={Math.ceil(totalCount / scanLimit)}
+                    totalPages={Math.ceil(allItems.length / scanLimit)}
                     totalCount={totalCount}
                     itemsPerPage={scanLimit}
-                    itemsShown={Math.min(currentPage * scanLimit, totalCount)}
+                    itemsShown={Math.min(currentPage * scanLimit, allItems.length)}
                     onPageChange={handlePageChange}
                     darkMode={darkMode}
                   />

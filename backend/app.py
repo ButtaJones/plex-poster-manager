@@ -365,14 +365,16 @@ def get_thumbnail():
         # Fetch image from Plex
         print(f"[thumbnail] Fetching: {thumb_url[:150]}...")
 
-        # Check if this is a Plex image proxy URL that causes redirect loops
-        # These URLs (images.plex.tv/photo) often create infinite redirects
-        if 'images.plex.tv/photo' in thumb_url:
-            print(f"[thumbnail] Skipping Plex image proxy URL (known redirect issue)")
-            return jsonify({"error": "Plex image proxy redirect loop"}), 404
-
-        # Make request with error handling for special characters
-        response = requests.get(thumb_url, timeout=10, allow_redirects=True)
+        # Make request with error handling
+        # Try to fetch - if it fails (404, redirect loop, etc.), we'll catch it
+        try:
+            response = requests.get(thumb_url, timeout=10, allow_redirects=True)
+        except requests.exceptions.TooManyRedirects:
+            print(f"[thumbnail] Too many redirects for URL (redirect loop)")
+            return jsonify({"error": "Too many redirects"}), 404
+        except requests.exceptions.RequestException as e:
+            print(f"[thumbnail] Request failed: {e}")
+            return jsonify({"error": f"Request failed: {str(e)}"}), 404
 
         if response.status_code != 200:
             print(f"[thumbnail] HTTP {response.status_code} for URL: {thumb_url[:150]}")
