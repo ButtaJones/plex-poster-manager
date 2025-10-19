@@ -361,17 +361,18 @@ function App() {
                 <Film className="w-4 h-4 inline mr-1" />
                 Library
               </label>
-              <select
-                value={selectedLibrary}
-                onChange={(e) => setSelectedLibrary(e.target.value)}
-                className={`w-full h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                disabled={librariesLoading || libraries.length === 0}
-              >
-                {librariesLoading ? (
-                  <option value="">Loading libraries... ⏳</option>
-                ) : libraries.length === 0 ? (
-                  <option value="">No libraries found</option>
-                ) : (
+              <div className="relative">
+                <select
+                  value={selectedLibrary}
+                  onChange={(e) => setSelectedLibrary(e.target.value)}
+                  className={`w-full h-11 px-4 pr-10 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  disabled={librariesLoading || libraries.length === 0}
+                >
+                  {librariesLoading ? (
+                    <option value="">Loading libraries...</option>
+                  ) : libraries.length === 0 ? (
+                    <option value="">No libraries found</option>
+                  ) : (
                   libraries.map((lib) => {
                     // Handle both old format (string) and new format (object with name/count)
                     const libName = typeof lib === 'string' ? lib : lib.name;
@@ -387,7 +388,14 @@ function App() {
                     );
                   })
                 )}
-              </select>
+                </select>
+                {/* Spinning loader icon when loading libraries */}
+                {librariesLoading && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <Loader className={`w-5 h-5 animate-spin ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Items Per Page */}

@@ -211,6 +211,10 @@ class PlexPosterManagerLauncher:
                                        command=self.update_dependencies)
         self.deps_button.pack(side="left", padx=5, fill="x", expand=True)
 
+        self.clear_button = ttk.Button(control_frame, text="🗑️ Clear Console",
+                                        command=self.clear_console)
+        self.clear_button.pack(side="left", padx=5, fill="x", expand=True)
+
         # --- Log Output Section ---
         log_frame = ttk.LabelFrame(main_frame, text="Server Output", padding="10")
         log_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(0, 10))
@@ -238,6 +242,11 @@ class PlexPosterManagerLauncher:
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
         self.root.update_idletasks()
+
+    def clear_console(self):
+        """Clear the console/log output."""
+        self.log_text.delete(1.0, tk.END)
+        self.log("Console cleared")
 
     def auto_detect_url(self):
         """Auto-detect Plex server URL."""
