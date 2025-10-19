@@ -707,10 +707,10 @@ function App() {
                 <div className="mb-4">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={Math.ceil(allItems.length / scanLimit)}
+                    totalPages={Math.ceil(totalCount / scanLimit)}
                     totalCount={totalCount}
                     itemsPerPage={scanLimit}
-                    itemsShown={Math.min(currentPage * scanLimit, allItems.length)}
+                    itemsShown={Math.min(allItems.length, totalCount)}
                     onPageChange={handlePageChange}
                     darkMode={darkMode}
                   />
@@ -840,10 +840,10 @@ function App() {
                 <div className="mt-4">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={Math.ceil(allItems.length / scanLimit)}
+                    totalPages={Math.ceil(totalCount / scanLimit)}
                     totalCount={totalCount}
                     itemsPerPage={scanLimit}
-                    itemsShown={Math.min(currentPage * scanLimit, allItems.length)}
+                    itemsShown={Math.min(allItems.length, totalCount)}
                     onPageChange={handlePageChange}
                     darkMode={darkMode}
                   />
