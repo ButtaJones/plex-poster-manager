@@ -318,21 +318,29 @@ function App() {
     }
   };
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     if (!searchQuery.trim()) {
-      handleScan();
+      // Empty search - show first page of all items
+      const firstPageItems = scanLimit ? allItems.slice(0, scanLimit) : allItems;
+      setItems(firstPageItems);
+      setCurrentPage(1);
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await libraryAPI.searchItems(searchQuery, selectedLibrary);
-      setItems(response.data.items);
-    } catch (error) {
-      console.error('Error searching:', error);
-      alert('Error searching: ' + error.message);
-    } finally {
-      setLoading(false);
+    // Search locally in cached allItems (instant, no API call needed)
+    const query = searchQuery.toLowerCase().trim();
+    const matchedItems = allItems.filter(item =>
+      item.info.title.toLowerCase().includes(query)
+    );
+
+    console.log(`[handleSearch] Found ${matchedItems.length} matches for "${searchQuery}" in ${allItems.length} cached items`);
+
+    // Show search results
+    setItems(matchedItems);
+    setCurrentPage(1);
+
+    if (matchedItems.length === 0) {
+      alert(`No results found for "${searchQuery}"`);
     }
   };
 
@@ -386,7 +394,37 @@ function App() {
       await artworkAPI.deleteArtwork(paths, 'User deletion');
       alert(`Successfully deleted ${paths.length} file(s)`);
 
-      handleScan();
+      // Remove deleted artwork from current items view (without re-scanning)
+      const pathSet = new Set(paths);
+      const updatedItems = items.map(item => {
+        const updatedArtwork = {};
+        Object.keys(item.artwork).forEach(type => {
+          updatedArtwork[type] = item.artwork[type].filter(art => !pathSet.has(art.path));
+        });
+        const newTotalArtwork = Object.values(updatedArtwork).reduce((sum, arr) => sum + arr.length, 0);
+        return {
+          ...item,
+          artwork: updatedArtwork,
+          total_artwork: newTotalArtwork
+        };
+      });
+
+      // Also update allItems cache
+      const updatedAllItems = allItems.map(item => {
+        const updatedArtwork = {};
+        Object.keys(item.artwork).forEach(type => {
+          updatedArtwork[type] = item.artwork[type].filter(art => !pathSet.has(art.path));
+        });
+        const newTotalArtwork = Object.values(updatedArtwork).reduce((sum, arr) => sum + arr.length, 0);
+        return {
+          ...item,
+          artwork: updatedArtwork,
+          total_artwork: newTotalArtwork
+        };
+      });
+
+      setItems(updatedItems);
+      setAllItems(updatedAllItems);
       setSelectedArtwork([]);
       loadOperations();
     } catch (error) {
