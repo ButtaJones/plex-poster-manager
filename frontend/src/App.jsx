@@ -71,6 +71,41 @@ function App() {
     localStorage.setItem('libraryThumbnailSize', libraryThumbnailSize.toString());
   }, [libraryThumbnailSize]);
 
+  // Save scan results to localStorage
+  useEffect(() => {
+    if (items.length > 0) {
+      const scanData = {
+        items,
+        selectedLibrary,
+        totalCount,
+        offset,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('scanResults', JSON.stringify(scanData));
+    }
+  }, [items, selectedLibrary, totalCount, offset]);
+
+  // Restore scan results from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('scanResults');
+      if (saved) {
+        const scanData = JSON.parse(saved);
+        // Only restore if less than 1 hour old
+        const oneHour = 60 * 60 * 1000;
+        if (Date.now() - scanData.timestamp < oneHour) {
+          setItems(scanData.items);
+          setSelectedLibrary(scanData.selectedLibrary);
+          setTotalCount(scanData.totalCount);
+          setOffset(scanData.offset);
+          console.log('[Frontend] Restored scan results from localStorage');
+        }
+      }
+    } catch (error) {
+      console.error('[Frontend] Error restoring scan results:', error);
+    }
+  }, []); // Only run on mount
+
   const loadLibraries = useCallback(async () => {
     setLibrariesLoading(true);
     try {
@@ -625,17 +660,21 @@ function App() {
               )}
 
               {/* List View */}
-              {viewMode === 'list' && items.map((item, index) => (
-                <ItemCard
-                  key={index}
-                  item={item}
-                  selectedArtwork={selectedArtwork}
-                  onSelectArtwork={handleSelectArtwork}
-                  onDeleteArtwork={handleDeleteArtwork}
-                  thumbnailSize={thumbnailSize}
-                  darkMode={darkMode}
-                />
-              ))}
+              {viewMode === 'list' && (
+                <div className="space-y-4">
+                  {items.map((item, index) => (
+                    <ItemCard
+                      key={index}
+                      item={item}
+                      selectedArtwork={selectedArtwork}
+                      onSelectArtwork={handleSelectArtwork}
+                      onDeleteArtwork={handleDeleteArtwork}
+                      thumbnailSize={thumbnailSize}
+                      darkMode={darkMode}
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Grid View */}
               {viewMode === 'grid' && (

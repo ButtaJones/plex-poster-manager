@@ -1,12 +1,22 @@
 import React from 'react';
 
 const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailSize = 300, darkMode = false }) => {
+  const [imageDimensions, setImageDimensions] = React.useState(null);
+
   const getThumbnailUrl = (thumbUrl) => {
     // Auto-detect API base URL from environment or construct from current host
     // This allows the app to work both on localhost and over the network
     const apiBaseUrl = process.env.REACT_APP_API_URL ||
                        `${window.location.protocol}//${window.location.hostname}:5000`;
     return `${apiBaseUrl}/api/thumbnail?url=${encodeURIComponent(thumbUrl)}`;
+  };
+
+  const handleImageLoad = (e) => {
+    // Get natural (original) dimensions of the image
+    setImageDimensions({
+      width: e.target.naturalWidth,
+      height: e.target.naturalHeight
+    });
   };
 
   // Calculate display size based on thumbnail size setting
@@ -91,6 +101,7 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
           className="w-full h-full object-cover"
           loading="lazy"
           crossOrigin="anonymous"
+          onLoad={handleImageLoad}
         />
         
         {/* Overlay on hover */}
@@ -119,6 +130,13 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
             darkMode ? 'text-green-400' : 'text-green-600'
           }`}>Active</span>}
         </div>
+        {imageDimensions && (
+          <div className={`text-xs mt-1 ${
+            darkMode ? 'text-gray-500' : 'text-gray-500'
+          }`}>
+            {imageDimensions.width} × {imageDimensions.height}
+          </div>
+        )}
       </div>
     </div>
   );
