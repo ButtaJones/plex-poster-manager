@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import ConfigModal from './components/ConfigModal';
 import ItemCard from './components/ItemCard';
+import Pagination from './components/Pagination';
 import { configAPI, libraryAPI, artworkAPI, operationsAPI } from './api';
 
 function App() {
@@ -23,8 +24,8 @@ function App() {
   const [showOperations, setShowOperations] = useState(false);
   const [scanProgress, setScanProgress] = useState(null);
   const [scanLimit, setScanLimit] = useState(25); // Default to 25 items
-  const [offset, setOffset] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // New UI state
   const [darkMode, setDarkMode] = useState(() => {
@@ -33,7 +34,18 @@ function App() {
   });
   const [thumbnailSize, setThumbnailSize] = useState(() => {
     const saved = localStorage.getItem('thumbnailSize');
-    return saved ? parseInt(saved) : 300;
+    if (saved) return parseInt(saved);
+    // Try to load from config defaults, fallback to 300
+    const configDefaults = localStorage.getItem('config');
+    if (configDefaults) {
+      try {
+        const parsed = JSON.parse(configDefaults);
+        return parsed.default_artwork_size || 300;
+      } catch (e) {
+        return 300;
+      }
+    }
+    return 300;
   });
   const [showSizeSlider, setShowSizeSlider] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
@@ -42,7 +54,18 @@ function App() {
   });
   const [libraryThumbnailSize, setLibraryThumbnailSize] = useState(() => {
     const saved = localStorage.getItem('libraryThumbnailSize');
-    return saved ? parseInt(saved) : 200;
+    if (saved) return parseInt(saved);
+    // Try to load from config defaults, fallback to 200
+    const configDefaults = localStorage.getItem('config');
+    if (configDefaults) {
+      try {
+        const parsed = JSON.parse(configDefaults);
+        return parsed.default_library_size || 200;
+      } catch (e) {
+        return 200;
+      }
+    }
+    return 200;
   });
   const [expandedGridItems, setExpandedGridItems] = useState(new Set()); // Track which grid items are expanded
 
@@ -116,6 +139,20 @@ function App() {
     try {
       await configAPI.updateConfig(newConfig);
       setConfig(newConfig);
+
+      // Save config to localStorage so defaults can be loaded on page refresh
+      localStorage.setItem('config', JSON.stringify(newConfig));
+
+      // If defaults were changed, update current sizes to match
+      if (newConfig.default_artwork_size) {
+        setThumbnailSize(newConfig.default_artwork_size);
+        localStorage.setItem('thumbnailSize', newConfig.default_artwork_size.toString());
+      }
+      if (newConfig.default_library_size) {
+        setLibraryThumbnailSize(newConfig.default_library_size);
+        localStorage.setItem('libraryThumbnailSize', newConfig.default_library_size.toString());
+      }
+
       setShowConfig(false);
       loadLibraries();
       alert('Configuration saved successfully!');
@@ -129,7 +166,7 @@ function App() {
     if (!selectedLibrary) return;
 
     setLoading(true);
-    setOffset(0);
+    setCurrentPage(1);
     setScanProgress({ scanning: true, current: 0, total: 0, current_item: '' });
 
     const progressInterval = setInterval(async () => {
@@ -150,7 +187,6 @@ function App() {
       setItems(response.data.items);
       setStats(response.data.stats);
       setTotalCount(response.data.stats.total_count || 0);
-      setOffset(scanLimit || 0);
       clearInterval(progressInterval);
       setScanProgress(null);
     } catch (error) {
@@ -181,10 +217,15 @@ function App() {
     }
   };
 
-  const handleLoadMore = async () => {
+  const handlePageChange = async (newPage) => {
     if (!selectedLibrary || !scanLimit) return;
 
+    // Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     setLoading(true);
+    setCurrentPage(newPage);
+    const newOffset = (newPage - 1) * scanLimit;
     setScanProgress({ scanning: true, current: 0, total: 0, current_item: '' });
 
     const progressInterval = setInterval(async () => {
@@ -201,15 +242,14 @@ function App() {
     }, 500);
 
     try {
-      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit, offset);
-      setItems((prevItems) => [...prevItems, ...response.data.items]);
+      const response = await libraryAPI.scanLibrary(selectedLibrary, scanLimit, newOffset);
+      setItems(response.data.items);
       setStats(response.data.stats);
-      setOffset((prevOffset) => prevOffset + scanLimit);
       clearInterval(progressInterval);
       setScanProgress(null);
     } catch (error) {
-      console.error('Error loading more:', error);
-      alert('Error loading more: ' + error.message);
+      console.error('Error changing page:', error);
+      alert('Error changing page: ' + error.message);
       clearInterval(progressInterval);
       setScanProgress(null);
     } finally {
@@ -616,13 +656,18 @@ function App() {
             </div>
           ) : items.length > 0 ? (
             <>
-              {/* Pagination Info */}
+              {/* Top Pagination */}
               {totalCount > 0 && scanLimit && (
-                <div className={`${darkMode ? 'bg-blue-900/30 border-blue-700' : 'bg-blue-50 border-blue-200'} border rounded-xl p-4 mb-4`}>
-                  <div className={`text-center font-medium ${darkMode ? 'text-blue-300' : 'text-blue-800'}`}>
-                    Showing {items.length} of {totalCount} items in library
-                    {offset < totalCount && ` (${Math.ceil((totalCount - offset) / scanLimit)} more page${Math.ceil((totalCount - offset) / scanLimit) === 1 ? '' : 's'} available)`}
-                  </div>
+                <div className="mb-4">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={Math.ceil(totalCount / scanLimit)}
+                    totalCount={totalCount}
+                    itemsPerPage={scanLimit}
+                    itemsShown={items.length}
+                    onPageChange={handlePageChange}
+                    darkMode={darkMode}
+                  />
                 </div>
               )}
 
@@ -728,17 +773,18 @@ function App() {
                 </div>
               )}
 
-              {/* Load More Button */}
-              {scanLimit && offset < totalCount && (
-                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6 text-center`}>
-                  <button
-                    onClick={handleLoadMore}
-                    disabled={loading}
-                    className={`px-6 py-3 rounded-lg font-medium transition-all inline-flex items-center gap-2 ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <ChevronDown className="w-5 h-5" />
-                    {loading ? 'Loading...' : `Load More (${Math.min(scanLimit, totalCount - offset)} more items)`}
-                  </button>
+              {/* Bottom Pagination */}
+              {totalCount > 0 && scanLimit && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={Math.ceil(totalCount / scanLimit)}
+                    totalCount={totalCount}
+                    itemsPerPage={scanLimit}
+                    itemsShown={items.length}
+                    onPageChange={handlePageChange}
+                    darkMode={darkMode}
+                  />
                 </div>
               )}
             </>

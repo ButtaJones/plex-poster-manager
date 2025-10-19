@@ -6,10 +6,16 @@ const ConfigModal = ({ isOpen, onClose, config, onSave, darkMode = false }) => {
     plex_token: config?.plex_token || '',
     backup_directory: config?.backup_directory || '',
     thumbnail_size: config?.thumbnail_size || [300, 450],
+    default_artwork_size: config?.default_artwork_size || 300,
+    default_library_size: config?.default_library_size || 200,
   });
 
   const [detecting, setDetecting] = useState(false);
   const [testing, setTesting] = useState(false);
+
+  // Get current sizes from localStorage (matching App.jsx)
+  const currentArtworkSize = parseInt(localStorage.getItem('thumbnailSize') || '300');
+  const currentLibrarySize = parseInt(localStorage.getItem('libraryThumbnailSize') || '200');
 
   const handleDetectUrl = async () => {
     setDetecting(true);
@@ -225,6 +231,118 @@ const ConfigModal = ({ isOpen, onClose, config, onSave, darkMode = false }) => {
             }`}>
               Adjust thumbnail display size (larger = better quality, slower loading)
             </p>
+          </div>
+
+          {/* Default Thumbnail Sizes Section */}
+          <div className={`border rounded-lg p-4 space-y-4 ${
+            darkMode
+              ? 'bg-purple-900/20 border-purple-700'
+              : 'bg-purple-50 border-purple-200'
+          }`}>
+            <h3 className={`font-semibold mb-3 ${
+              darkMode ? 'text-gray-200' : 'text-gray-800'
+            }`}>
+              Default Thumbnail Sizes
+            </h3>
+            <p className={`text-sm mb-3 ${
+              darkMode ? 'text-gray-400' : 'text-gray-600'
+            }`}>
+              Set your preferred default sizes. These will be applied when the page loads.
+            </p>
+
+            {/* Artwork Size (List View) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`text-sm font-medium ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Artwork Size (List View): {formData.default_artwork_size}px
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, default_artwork_size: currentArtworkSize });
+                    alert(`Set default artwork size to ${currentArtworkSize}px`);
+                  }}
+                  className={`text-xs px-3 py-1 rounded-md transition-colors ${
+                    darkMode
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                >
+                  Set as Default ({currentArtworkSize}px)
+                </button>
+              </div>
+              <input
+                type="range"
+                min="150"
+                max="500"
+                step="10"
+                value={formData.default_artwork_size}
+                onChange={(e) =>
+                  setFormData({ ...formData, default_artwork_size: parseInt(e.target.value) })
+                }
+                className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                  darkMode
+                    ? 'bg-gray-700 accent-purple-400'
+                    : 'bg-gray-200 accent-purple-600'
+                }`}
+              />
+              <div className={`flex justify-between text-xs mt-1 ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                <span>150px</span>
+                <span>300px</span>
+                <span>500px</span>
+              </div>
+            </div>
+
+            {/* Library Poster Size (Grid View) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`text-sm font-medium ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Library Poster Size (Grid View): {formData.default_library_size}px
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, default_library_size: currentLibrarySize });
+                    alert(`Set default library size to ${currentLibrarySize}px`);
+                  }}
+                  className={`text-xs px-3 py-1 rounded-md transition-colors ${
+                    darkMode
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                >
+                  Set as Default ({currentLibrarySize}px)
+                </button>
+              </div>
+              <input
+                type="range"
+                min="100"
+                max="400"
+                step="10"
+                value={formData.default_library_size}
+                onChange={(e) =>
+                  setFormData({ ...formData, default_library_size: parseInt(e.target.value) })
+                }
+                className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                  darkMode
+                    ? 'bg-gray-700 accent-purple-400'
+                    : 'bg-gray-200 accent-purple-600'
+                }`}
+              />
+              <div className={`flex justify-between text-xs mt-1 ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                <span>100px</span>
+                <span>250px</span>
+                <span>400px</span>
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
