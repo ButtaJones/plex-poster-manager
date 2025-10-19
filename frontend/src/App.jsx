@@ -31,6 +31,9 @@ function App() {
   const [selectedArtwork, setSelectedArtwork] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [stats, setStats] = useState(null);
   const [operations, setOperations] = useState([]);
   const [showOperations, setShowOperations] = useState(false);
@@ -166,6 +169,29 @@ function App() {
       }
     }
   }, [allItems, selectedLibrary, totalCount, currentPage, scanLimit]);
+
+  // Generate autocomplete suggestions based on searchQuery
+  useEffect(() => {
+    if (searchQuery.trim().length > 0 && allItems.length > 0) {
+      const query = searchQuery.toLowerCase().trim();
+      const matches = allItems
+        .filter(item => item.info.title.toLowerCase().includes(query))
+        .slice(0, 10) // Limit to 10 suggestions
+        .map(item => ({
+          title: item.info.title,
+          year: item.info.year,
+          type: item.info.type,
+          rating_key: item.info.rating_key
+        }));
+
+      setSearchSuggestions(matches);
+      setShowSuggestions(matches.length > 0);
+    } else {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+    }
+    setSelectedSuggestionIndex(-1);
+  }, [searchQuery, allItems]);
 
   const loadLibraries = useCallback(async () => {
     setLibrariesLoading(true);
@@ -520,20 +546,86 @@ function App() {
             </div>
 
             {/* Search */}
-            <div className="lg:col-span-5">
+            <div className="lg:col-span-5 relative">
               <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                 <Search className="w-4 h-4 inline mr-1" />
                 Search
               </label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="Search by title..."
-                  className={`flex-1 h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                />
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setSelectedSuggestionIndex(prev =>
+                          prev < searchSuggestions.length - 1 ? prev + 1 : prev
+                        );
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+                      } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (selectedSuggestionIndex >= 0 && searchSuggestions[selectedSuggestionIndex]) {
+                          setSearchQuery(searchSuggestions[selectedSuggestionIndex].title);
+                          setShowSuggestions(false);
+                          setSelectedSuggestionIndex(-1);
+                        } else {
+                          handleSearch();
+                        }
+                      } else if (e.key === 'Escape') {
+                        setShowSuggestions(false);
+                        setSelectedSuggestionIndex(-1);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay to allow clicking on suggestions
+                      setTimeout(() => setShowSuggestions(false), 200);
+                    }}
+                    onFocus={() => {
+                      if (searchSuggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    placeholder="Search by title..."
+                    className={`w-full h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  />
+
+                  {/* Autocomplete Dropdown */}
+                  {showSuggestions && searchSuggestions.length > 0 && (
+                    <div className={`absolute z-50 w-full mt-1 rounded-lg shadow-lg border max-h-60 overflow-y-auto ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
+                      {searchSuggestions.map((suggestion, index) => (
+                        <div
+                          key={suggestion.rating_key}
+                          onClick={() => {
+                            setSearchQuery(suggestion.title);
+                            setShowSuggestions(false);
+                            setSelectedSuggestionIndex(-1);
+                          }}
+                          className={`px-4 py-3 cursor-pointer transition-colors border-b last:border-b-0 ${
+                            index === selectedSuggestionIndex
+                              ? darkMode
+                                ? 'bg-purple-900 border-gray-700'
+                                : 'bg-purple-100 border-gray-200'
+                              : darkMode
+                                ? 'hover:bg-gray-700 border-gray-700'
+                                : 'hover:bg-gray-50 border-gray-200'
+                          }`}
+                        >
+                          <div className={`font-medium ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                            {suggestion.title}
+                          </div>
+                          <div className={`text-xs flex gap-2 mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <span className="capitalize">{suggestion.type}</span>
+                            {suggestion.year && <span>• {suggestion.year}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={handleSearch}
                   className={`h-11 px-4 rounded-lg font-medium transition-all flex items-center gap-2 ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-800'} text-white`}
