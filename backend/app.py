@@ -462,9 +462,11 @@ def search_items():
     library = data.get('library', 'TV Shows')
 
     try:
-        all_items = scanner.scan_library(library)
+        # scan_library returns {'items': [...], 'total_count': N}
+        result = scanner.scan_library(library)
+        all_items = result['items']
 
-        # Filter by search query (access info.title due to new structure)
+        # Filter by search query
         filtered_items = [
             item for item in all_items
             if query in item['info']['title'].lower()
@@ -477,6 +479,9 @@ def search_items():
         })
 
     except Exception as e:
+        print(f"[API /api/search] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)
