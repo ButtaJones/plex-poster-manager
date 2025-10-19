@@ -454,10 +454,16 @@ function App() {
                 onChange={(e) => {
                   const newLimit = e.target.value ? parseInt(e.target.value) : null;
                   setScanLimit(newLimit);
-                  // Reset to page 1 and recalculate items when limit changes
-                  setCurrentPage(1);
+                  // Recalculate pagination with new items per page
                   if (newLimit && allItems.length > 0) {
-                    setItems(allItems.slice(0, newLimit));
+                    // Use handlePageChange to properly recalculate with new limit
+                    setCurrentPage(1);
+                    const pageItems = allItems.slice(0, newLimit);
+                    setItems(pageItems);
+                  } else if (!newLimit && allItems.length > 0) {
+                    // "All Items" selected - show everything
+                    setCurrentPage(1);
+                    setItems(allItems);
                   }
                 }}
                 className={`w-full h-11 px-4 rounded-lg border transition-colors ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
