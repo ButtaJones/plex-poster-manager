@@ -71,40 +71,7 @@ function App() {
     localStorage.setItem('libraryThumbnailSize', libraryThumbnailSize.toString());
   }, [libraryThumbnailSize]);
 
-  // Save scan results to localStorage
-  useEffect(() => {
-    if (items.length > 0) {
-      const scanData = {
-        items,
-        selectedLibrary,
-        totalCount,
-        offset,
-        timestamp: Date.now()
-      };
-      localStorage.setItem('scanResults', JSON.stringify(scanData));
-    }
-  }, [items, selectedLibrary, totalCount, offset]);
-
-  // Restore scan results from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('scanResults');
-      if (saved) {
-        const scanData = JSON.parse(saved);
-        // Only restore if less than 1 hour old
-        const oneHour = 60 * 60 * 1000;
-        if (Date.now() - scanData.timestamp < oneHour) {
-          setItems(scanData.items);
-          setSelectedLibrary(scanData.selectedLibrary);
-          setTotalCount(scanData.totalCount);
-          setOffset(scanData.offset);
-          console.log('[Frontend] Restored scan results from localStorage');
-        }
-      }
-    } catch (error) {
-      console.error('[Frontend] Error restoring scan results:', error);
-    }
-  }, []); // Only run on mount
+  // Note: localStorage persistence removed - fresh start on each browser open
 
   const loadLibraries = useCallback(async () => {
     setLibrariesLoading(true);

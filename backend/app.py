@@ -365,8 +365,11 @@ def get_thumbnail():
         # Fetch image from Plex
         print(f"[thumbnail] Fetching: {thumb_url[:150]}...")
 
-        # Make request with error handling for special characters
-        response = requests.get(thumb_url, timeout=10, allow_redirects=True)
+        # Make request with limited redirects to prevent infinite loops
+        # Some Plex image proxy URLs can create redirect loops
+        session = requests.Session()
+        session.max_redirects = 5
+        response = session.get(thumb_url, timeout=10, allow_redirects=True)
 
         if response.status_code != 200:
             print(f"[thumbnail] HTTP {response.status_code} for URL: {thumb_url[:150]}")
