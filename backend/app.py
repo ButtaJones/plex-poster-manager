@@ -384,7 +384,11 @@ def get_thumbnail():
         img.save(img_io, 'JPEG', quality=85)
         img_io.seek(0)
 
-        return send_file(img_io, mimetype='image/jpeg')
+        # Create response with proper headers to prevent CORB
+        response = send_file(img_io, mimetype='image/jpeg')
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+        return response
 
     except Exception as e:
         print(f"[thumbnail] ERROR: {e}")
