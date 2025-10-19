@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """
 Plex Poster Manager GUI Launcher
-Provides a simple GUI to launch and manage both backend and frontend servers.
+Provides a modern GUI to launch and manage both backend and frontend servers.
 """
 
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+try:
+    import customtkinter as ctk
+    from tkinter import filedialog, messagebox
+    CTK_AVAILABLE = True
+except ImportError:
+    # Fallback to regular tkinter if CustomTkinter not available
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox, scrolledtext
+    CTK_AVAILABLE = False
+
 import subprocess
 import threading
 import os
