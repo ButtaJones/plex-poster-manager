@@ -363,11 +363,14 @@ def get_thumbnail():
 
     try:
         # Fetch image from Plex
-        print(f"[thumbnail] Fetching: {thumb_url[:100]}...")
-        response = requests.get(thumb_url, timeout=10)
+        print(f"[thumbnail] Fetching: {thumb_url[:150]}...")
+
+        # Make request with error handling for special characters
+        response = requests.get(thumb_url, timeout=10, allow_redirects=True)
 
         if response.status_code != 200:
-            print(f"[thumbnail] HTTP {response.status_code} for URL: {thumb_url[:100]}")
+            print(f"[thumbnail] HTTP {response.status_code} for URL: {thumb_url[:150]}")
+            print(f"[thumbnail] Response text: {response.text[:200]}")
             return jsonify({"error": f"Plex returned {response.status_code}"}), 404
 
         # Check if response is actually an image
@@ -400,13 +403,17 @@ def get_thumbnail():
         return response
 
     except requests.exceptions.Timeout:
-        print(f"[thumbnail] Timeout fetching URL: {thumb_url[:100]}")
+        print(f"[thumbnail] Timeout fetching URL: {thumb_url[:150]}")
         return jsonify({"error": "Request timeout"}), 504
     except requests.exceptions.RequestException as e:
-        print(f"[thumbnail] Request error: {e}")
+        print(f"[thumbnail] Request error for URL: {thumb_url[:150]}")
+        print(f"[thumbnail] Error details: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Network error: {str(e)}"}), 500
     except Exception as e:
-        print(f"[thumbnail] ERROR processing {thumb_url[:100]}: {e}")
+        print(f"[thumbnail] ERROR processing URL: {thumb_url[:150]}")
+        print(f"[thumbnail] Error details: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

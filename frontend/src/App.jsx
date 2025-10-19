@@ -12,7 +12,7 @@ function App() {
   const [config, setConfig] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
   const [libraries, setLibraries] = useState([]);
-  const [librariesLoading, setLibrariesLoading] = useState(false);
+  const [librariesLoading, setLibrariesLoading] = useState(true); // Start as true to show "Loading..." on initial render
   const [selectedLibrary, setSelectedLibrary] = useState('TV Shows');
   const [items, setItems] = useState([]);
   const [selectedArtwork, setSelectedArtwork] = useState([]);

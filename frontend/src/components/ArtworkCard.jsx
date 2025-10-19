@@ -20,9 +20,10 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
   };
 
   // Calculate display size based on thumbnail size setting
-  // Width is controlled by thumbnailSize, height uses aspect-ratio for proper poster proportions
+  // Use max-width to prevent overflow, height uses aspect-ratio for proper poster proportions
   const cardStyle = {
-    width: `${thumbnailSize}px`,
+    maxWidth: `${thumbnailSize}px`,
+    width: '100%', // Take full width of grid cell up to maxWidth
     margin: '0 auto' // Center cards in their grid cells
   };
 
