@@ -85,6 +85,7 @@ const ArtworkCard = ({ artwork, item, onSelect, isSelected, onDelete, thumbnailS
           alt={`${artwork.type} - ${artwork.provider}`}
           className="w-full h-full object-cover"
           loading="lazy"
+          crossOrigin="anonymous"
         />
         
         {/* Overlay on hover */}
