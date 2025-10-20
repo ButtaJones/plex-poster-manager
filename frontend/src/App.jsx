@@ -30,6 +30,7 @@ function App() {
   const [items, setItems] = useState([]);
   const [selectedArtwork, setSelectedArtwork] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -122,15 +123,18 @@ function App() {
           setScanLimit(savedData.scanLimit || 25);
           setSelectedLibrary(savedData.selectedLibrary || 'TV Shows');
 
-          // Set initial page items
-          const limit = savedData.scanLimit || 25;
-          const pageItems = savedData.allItems.slice(0, limit);
+          // Set initial page items - handle "All Items" case (null scanLimit)
+          const limit = savedData.scanLimit;
+          const pageItems = limit ? savedData.allItems.slice(0, limit) : savedData.allItems;
           setItems(pageItems);
 
           console.log(`[App] Restored ${savedData.allItems.length} items from IndexedDB`);
         }
       } catch (error) {
         console.error('[App] Failed to load scan results:', error);
+      } finally {
+        // Mark initial load as complete whether we found data or not
+        setInitialLoadComplete(true);
       }
     };
 
@@ -423,9 +427,21 @@ function App() {
         };
       });
 
-      setItems(updatedItems);
       setAllItems(updatedAllItems);
       setSelectedArtwork([]);
+
+      // If we're in a filtered view (from search/dropdown), go back to paginated results
+      if (items.length < allItems.length || searchQuery.trim()) {
+        // Clear search and show first page
+        setSearchQuery('');
+        const firstPageItems = scanLimit ? updatedAllItems.slice(0, scanLimit) : updatedAllItems;
+        setItems(firstPageItems);
+        setCurrentPage(1);
+      } else {
+        // Otherwise just update the current view
+        setItems(updatedItems);
+      }
+
       loadOperations();
     } catch (error) {
       console.error('Error deleting artwork:', error);
@@ -636,9 +652,18 @@ function App() {
                         <div
                           key={suggestion.rating_key}
                           onClick={() => {
+                            // Navigate directly to the selected show
                             setSearchQuery(suggestion.title);
                             setShowSuggestions(false);
                             setSelectedSuggestionIndex(-1);
+
+                            // Filter to show only this specific item
+                            const matchedItems = allItems.filter(item => item.info.rating_key === suggestion.rating_key);
+                            setItems(matchedItems);
+                            setCurrentPage(1);
+
+                            // Scroll to top
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                           className={`px-4 py-3 cursor-pointer transition-colors border-b last:border-b-0 ${
                             index === selectedSuggestionIndex
@@ -885,7 +910,13 @@ function App() {
 
         {/* Items List/Grid */}
         <div className={viewMode === 'list' ? 'space-y-4' : ''}>
-          {loading ? (
+          {!initialLoadComplete ? (
+            // Show loading state while checking IndexedDB
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
+              <Loader className={`w-12 h-12 mx-auto mb-4 animate-spin ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+              <div className={`text-lg mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading...</div>
+            </div>
+          ) : loading ? (
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-12 text-center`}>
               <Loader className={`w-12 h-12 mx-auto mb-4 animate-spin ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
               <div className={`text-lg mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Scanning library...</div>
