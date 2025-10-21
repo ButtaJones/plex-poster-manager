@@ -347,16 +347,16 @@ class PlexScannerAPI:
 
         # FILTER: Only show artwork that can actually be deleted (exists in Uploads folder)
         # This prevents showing agent-provided posters that can't be deleted
-        uploads_file_count = self._get_uploads_file_count(item)
+        uploads_file_count = self._get_uploads_file_count(item, debug=detailed)
 
         if uploads_file_count > 0:
             # Mark that this item has deletable artwork
             if detailed:
-                print(f"  [artwork] Found {uploads_file_count} deletable files in Uploads folder")
+                print(f"  [artwork] ✓ Found {uploads_file_count} deletable files in Uploads folder")
         else:
             # No custom artwork to delete - clear all artwork lists
             if detailed:
-                print(f"  [artwork] No custom artwork in Uploads folder (showing agent posters only)")
+                print(f"  [artwork] ✗ No custom artwork in Uploads folder")
             # Don't clear - we still want to show the posters for viewing
             # But we could add a flag to indicate they're not deletable
 
@@ -383,17 +383,22 @@ class PlexScannerAPI:
             "custom_artwork_count": uploads_file_count  # NEW: How many deletable files
         }
 
-    def _get_uploads_file_count(self, item) -> int:
+    def _get_uploads_file_count(self, item, debug: bool = False) -> int:
         """
         Check how many actual artwork files exist in the Uploads folder.
         Returns count of deletable files.
         """
         try:
             if not hasattr(item, 'metadataDirectory'):
+                if debug:
+                    print(f"    [uploads_check] No metadataDirectory property")
                 return 0
 
             metadata_dir_raw = item.metadataDirectory
             metadata_dir = Path(metadata_dir_raw)
+
+            if debug:
+                print(f"    [uploads_check] Raw path: {metadata_dir_raw}")
 
             # Resolve relative paths
             if not metadata_dir.is_absolute():
@@ -401,6 +406,8 @@ class PlexScannerAPI:
                     transcoder_path = self.plex.transcodeDirectory
                     plex_data_dir = Path(transcoder_path).parent
                     metadata_dir = plex_data_dir / metadata_dir_raw
+                    if debug:
+                        print(f"    [uploads_check] Resolved via transcoder: {metadata_dir}")
                 except Exception:
                     system = platform.system()
                     if system == 'Windows':
@@ -410,22 +417,61 @@ class PlexScannerAPI:
                     else:
                         plex_data_dir = Path("/var/lib/plexmediaserver/Library/Application Support/Plex Media Server")
                     metadata_dir = plex_data_dir / metadata_dir_raw
+                    if debug:
+                        print(f"    [uploads_check] Resolved via platform default: {metadata_dir}")
 
             if not metadata_dir.exists():
+                if debug:
+                    print(f"    [uploads_check] ✗ Metadata directory does not exist: {metadata_dir}")
                 return 0
+
+            if debug:
+                print(f"    [uploads_check] ✓ Metadata directory exists: {metadata_dir}")
+
+            # Check what's actually in the metadata directory
+            if debug:
+                try:
+                    contents = list(metadata_dir.iterdir())
+                    print(f"    [uploads_check] Contents: {[f.name for f in contents[:10]]}")
+                except Exception as e:
+                    print(f"    [uploads_check] Could not list directory: {e}")
 
             uploads_dir = metadata_dir / "Uploads"
             if not uploads_dir.exists():
+                if debug:
+                    print(f"    [uploads_check] ✗ No Uploads folder at: {uploads_dir}")
                 return 0
+
+            if debug:
+                print(f"    [uploads_check] ✓ Uploads folder exists: {uploads_dir}")
 
             # Count .jpg, .jpeg, .png files
             file_count = 0
+            all_files = []
             for ext in ['*.jpg', '*.jpeg', '*.png']:
-                file_count += len(list(uploads_dir.glob(ext)))
+                files = list(uploads_dir.glob(ext))
+                file_count += len(files)
+                if debug and files:
+                    all_files.extend([f.name for f in files])
+
+            if debug:
+                if file_count > 0:
+                    print(f"    [uploads_check] ✓ Found {file_count} file(s): {all_files[:5]}")
+                else:
+                    # Check if there are ANY files in Uploads folder
+                    try:
+                        all_contents = list(uploads_dir.iterdir())
+                        print(f"    [uploads_check] ✗ No .jpg/.png files, but folder has: {[f.name for f in all_contents[:5]]}")
+                    except Exception as e:
+                        print(f"    [uploads_check] ✗ Could not list Uploads folder: {e}")
 
             return file_count
 
         except Exception as e:
+            if debug:
+                print(f"    [uploads_check] ERROR: {e}")
+                import traceback
+                traceback.print_exc()
             return 0
 
     def delete_artwork(self, item_rating_key: str, artwork_path: str) -> Dict:
