@@ -4,6 +4,66 @@ All notable changes to Plex Poster Manager will be documented in this file.
 
 ---
 
+## [2.2.1] - 2025-10-21
+
+### 🐛 CRITICAL BUG FIX - Extensionless File Detection
+
+#### Problem Discovered During Windows Testing
+- **Root Cause**: Plex stores uploaded artwork files **WITHOUT file extensions**
+  - Example: `c3074109ac427681678c1ec6ade63183352d698c` (is a JPEG, no `.jpg` extension)
+  - This is Plex's internal storage format for all custom uploads
+- **Impact**: Scan was looking for `*.jpg`, `*.jpeg`, `*.png` patterns only
+- **Result**: Scan found **0 items** even when custom artwork existed in Uploads folders
+- **Severity**: ⚠️ CRITICAL - Made core functionality completely non-functional
+
+#### Solution Applied
+- Changed glob pattern from `'*.jpg'` to `'*'` (all files) in Uploads folder scanning
+- Modified methods:
+  - `_get_uploads_file_count()` (lines 456-484)
+  - `delete_artwork()` (lines 622-643)
+- Added support for season subfolders: `posters/seasons/1/`, `posters/seasons/2/`, etc.
+- Now detects all artwork files regardless of whether they have extensions
+
+#### Testing Results (Windows 10)
+- **Platform**: Windows 10 Build 19045.6456
+- **Server**: "BFLlX" (Plex v1.42.1.10060, 14 libraries, 2,262 TV shows)
+- **Before Fix**: 0 items found (out of 100 scanned)
+- **After Fix**: 57 items found with 507 deletable files
+- **Space Available**: Several hundred MB of deletable custom artwork detected
+
+#### Verification Details
+```
+Manual File Check:
+$ file c3074109ac427681678c1ec6ade63183352d698c
+> JPEG image data, progressive, precision 8, 360x540, components 3
+
+Location: .../Uploads/posters/c3074109ac427681678c1ec6ade63183352d698c
+Size: 144 KB
+Type: JPEG (no .jpg extension)
+```
+
+#### All Features Re-Tested and Verified ✅
+- [x] **Scan**: Finds 57 TV shows with custom artwork (was 0)
+- [x] **Delete**: Successfully deleted 2 files, freed 0.76 MB
+- [x] **Disk Space**: Verified files actually removed from filesystem
+- [x] **Backup**: Auto-created timestamped backup folder before deletion
+- [x] **Backup Integrity**: Both files intact, correct sizes, valid JPEGs
+- [x] **Operations Log**: Tracked with undo capability
+- [x] **Empty Trash**: Permanently deleted all backups successfully
+
+### 📝 Files Modified
+- `backend/plex_scanner_api.py` - Fixed file detection logic (2 methods)
+
+### 📚 Documentation Added
+- `WINDOWS_TESTING_REPORT.md` - Initial bug discovery and analysis
+- `WINDOWS_TESTING_SUCCESS_REPORT.md` - Complete test results and metrics
+
+### 🎯 Recommendation
+**CRITICAL UPDATE** - All v2.2.0-dev users should update immediately.
+Without this fix, the scan feature will not find any custom artwork.
+
+---
+
 ## [2.2.0-dev] - 2025-10-20
 
 ### 🚀 Major Features
