@@ -357,25 +357,25 @@ class PlexScannerAPI:
 
     def delete_artwork(self, item_rating_key: str, artwork_path: str) -> Dict:
         """
-        Delete/unlock artwork for an item.
+        Delete artwork FILES from disk (not just unlock in Plex).
 
-        Important: PlexAPI cannot delete individual posters from the available list.
-        It can only UNLOCK artwork, which resets it to agent defaults.
+        This method finds the actual .jpg/.png files in the Plex Metadata folder
+        and deletes them using the FileManager backup system.
 
         Args:
             item_rating_key: Plex rating key for the item (show/movie)
-            artwork_path: Full path like "303344/poster/12345"
+            artwork_path: Full path like "303344/poster/poster_0"
 
         Returns:
-            Dict with success status and message
+            Dict with success status, files deleted, bytes freed, and backup info
         """
-        print(f"\n[delete_artwork] Processing deletion request")
+        print(f"\n[delete_artwork] Processing FILESYSTEM deletion request")
         print(f"[delete_artwork] Item rating key: {item_rating_key}")
         print(f"[delete_artwork] Artwork path: {artwork_path}")
 
         try:
             # Parse path to get artwork type
-            # Format: "item_rating_key/artwork_type/artwork_rating_key"
+            # Format: "item_rating_key/artwork_type/artwork_id"
             parts = artwork_path.split('/')
             if len(parts) != 3:
                 return {
@@ -383,15 +383,11 @@ class PlexScannerAPI:
                     "error": f"Invalid artwork path format: {artwork_path}"
                 }
 
-            _, artwork_type, artwork_rating_key = parts
-            print(f"[delete_artwork] Type: {artwork_type}, Rating key: {artwork_rating_key}")
+            _, artwork_type, artwork_id = parts
+            print(f"[delete_artwork] Type: {artwork_type}, ID: {artwork_id}")
 
             # Fetch the item from Plex
             print(f"[delete_artwork] Fetching item with rating key: {item_rating_key}")
-            print(f"[delete_artwork] Plex URL: {self.plex_url}")
-
-            # Use the library to fetch the item instead of direct fetchItem
-            # This avoids URL construction issues
             try:
                 item = self.plex.fetchItem(int(item_rating_key))
                 print(f"[delete_artwork] Found item: {item.title}")
@@ -408,51 +404,112 @@ class PlexScannerAPI:
                 else:
                     raise Exception(f"Could not find item with rating key: {item_rating_key}")
 
-            # PlexAPI Limitation: Cannot delete individual posters
-            # Can only unlock to reset to agent defaults
-            if artwork_type == 'poster':
-                print(f"[delete_artwork] Unlocking poster for: {item.title}")
-                item.unlockPoster()
-                action = "unlocked poster"
-            elif artwork_type == 'art' or artwork_type == 'background':
-                print(f"[delete_artwork] Unlocking background art for: {item.title}")
-                item.unlockArt()
-                action = "unlocked background"
-            elif artwork_type == 'banner':
-                print(f"[delete_artwork] Unlocking banner for: {item.title}")
-                # Banners might not have unlock, try generic field unlock
-                try:
-                    item.unlockPoster()  # Some libraries treat banners as posters
-                    action = "unlocked banner"
-                except Exception as e:
-                    print(f"[delete_artwork] Banner unlock not supported: {e}")
-                    return {
-                        "success": False,
-                        "error": "Banner unlock not supported by PlexAPI"
-                    }
-            elif artwork_type == 'theme':
-                print(f"[delete_artwork] WARNING: Themes cannot be deleted via PlexAPI")
+            # Get the metadata directory for this item
+            if not hasattr(item, 'metadataDirectory'):
                 return {
                     "success": False,
-                    "error": "Themes cannot be deleted using PlexAPI (PlexAPI limitation)"
+                    "error": f"Item type '{item.type}' does not have metadataDirectory property"
+                }
+
+            metadata_dir = Path(item.metadataDirectory)
+            print(f"[delete_artwork] Metadata directory: {metadata_dir}")
+
+            if not metadata_dir.exists():
+                return {
+                    "success": False,
+                    "error": f"Metadata directory does not exist: {metadata_dir}"
+                }
+
+            # Look for Uploads subfolder
+            uploads_dir = metadata_dir / "Uploads"
+            print(f"[delete_artwork] Checking uploads directory: {uploads_dir}")
+
+            if not uploads_dir.exists():
+                print(f"[delete_artwork] No Uploads folder found - no custom artwork to delete")
+                return {
+                    "success": False,
+                    "error": f"No Uploads folder found in {metadata_dir}",
+                    "info": "This item has no custom uploaded artwork to delete"
+                }
+
+            # Find artwork files in Uploads folder
+            artwork_files = []
+            for ext in ['*.jpg', '*.jpeg', '*.png']:
+                artwork_files.extend(uploads_dir.glob(ext))
+
+            if not artwork_files:
+                print(f"[delete_artwork] No artwork files found in Uploads folder")
+                return {
+                    "success": False,
+                    "error": "No artwork files found in Uploads folder",
+                    "info": "Uploads folder exists but contains no image files"
+                }
+
+            print(f"[delete_artwork] Found {len(artwork_files)} artwork files to delete")
+            for f in artwork_files:
+                print(f"  - {f.name} ({f.stat().st_size} bytes)")
+
+            # Initialize file manager with backup directory from config
+            from file_manager import FileManager
+            import json
+            config_path = Path(__file__).parent.parent / "config.json"
+            backup_dir = None
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    backup_dir = config.get('backup_directory')
+
+            file_manager = FileManager(backup_dir=backup_dir)
+
+            # Delete files using file manager (moves to backup)
+            deleted_files = []
+            total_bytes = 0
+            failed = []
+
+            for artwork_file in artwork_files:
+                file_size = artwork_file.stat().st_size
+                result = file_manager.delete_file(
+                    str(artwork_file),
+                    reason=f"Deleted via Plex Poster Manager - {item.title}"
+                )
+
+                if result['success']:
+                    deleted_files.append(str(artwork_file))
+                    total_bytes += file_size
+                    print(f"[delete_artwork] ✓ Deleted: {artwork_file.name} ({file_size} bytes)")
+                else:
+                    failed.append({
+                        "file": str(artwork_file),
+                        "error": result.get('error')
+                    })
+                    print(f"[delete_artwork] ✗ Failed: {artwork_file.name} - {result.get('error')}")
+
+            # Trigger Plex to refresh metadata after file deletion
+            print(f"[delete_artwork] Triggering Plex metadata refresh...")
+            try:
+                item.refresh()
+                print(f"[delete_artwork] ✓ Plex refresh triggered")
+            except Exception as e:
+                print(f"[delete_artwork] Warning: Plex refresh failed: {e}")
+
+            if deleted_files:
+                print(f"[delete_artwork] ✓ Successfully deleted {len(deleted_files)} files ({total_bytes} bytes)")
+                return {
+                    "success": True,
+                    "deleted_count": len(deleted_files),
+                    "deleted_files": deleted_files,
+                    "bytes_freed": total_bytes,
+                    "mb_freed": round(total_bytes / (1024 * 1024), 2),
+                    "failed": failed,
+                    "item_title": item.title,
+                    "message": f"Deleted {len(deleted_files)} artwork files for {item.title} ({round(total_bytes / (1024 * 1024), 2)} MB freed)"
                 }
             else:
                 return {
                     "success": False,
-                    "error": f"Unknown artwork type: {artwork_type}"
+                    "error": "All file deletions failed",
+                    "failed": failed
                 }
-
-            # Trigger metadata refresh to update Plex
-            print(f"[delete_artwork] Triggering metadata refresh...")
-            item.refresh()
-
-            print(f"[delete_artwork] ✓ Successfully {action} and refreshed: {item.title}")
-            return {
-                "success": True,
-                "action": action,
-                "item_title": item.title,
-                "message": f"Successfully {action} for {item.title}. Plex will revert to agent defaults."
-            }
 
         except NotFound:
             error = f"Item not found with rating key: {item_rating_key}"

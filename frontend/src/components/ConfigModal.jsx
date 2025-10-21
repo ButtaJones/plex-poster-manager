@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ConfigModal = ({ isOpen, onClose, config, onSave, darkMode = false }) => {
   const [formData, setFormData] = useState({
@@ -12,6 +12,20 @@ const ConfigModal = ({ isOpen, onClose, config, onSave, darkMode = false }) => {
 
   const [detecting, setDetecting] = useState(false);
   const [testing, setTesting] = useState(false);
+
+  // Update formData when config prop changes (fixes token not persisting)
+  useEffect(() => {
+    if (config) {
+      setFormData({
+        plex_url: config.plex_url || 'http://localhost:32400',
+        plex_token: config.plex_token || '',
+        backup_directory: config.backup_directory || '',
+        thumbnail_size: config.thumbnail_size || [300, 450],
+        default_artwork_size: config.default_artwork_size || 300,
+        default_library_size: config.default_library_size || 200,
+      });
+    }
+  }, [config]);
 
   // Get current sizes from localStorage (matching App.jsx)
   const currentArtworkSize = parseInt(localStorage.getItem('thumbnailSize') || '300');

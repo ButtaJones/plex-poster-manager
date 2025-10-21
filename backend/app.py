@@ -430,10 +430,10 @@ def get_thumbnail():
 @app.route('/api/delete', methods=['POST'])
 def delete_artwork():
     """
-    Delete/unlock artwork via Plex API.
+    Delete artwork FILES from disk.
 
-    Important: PlexAPI can only UNLOCK artwork (resets to agent defaults),
-    not delete individual posters from the available list.
+    Uses PlexAPI to find the metadata directory, then deletes actual
+    .jpg/.png files from the Uploads folder. Backs up files before deletion.
     """
     global scanner
 
@@ -490,27 +490,22 @@ def delete_artwork():
             **result
         })
 
-    # Store operation for history (metadata only, no file backup needed)
-    from datetime import datetime
-    operation = {
-        "timestamp": datetime.now().isoformat(),
-        "action": "unlock_artwork",
-        "total": len(artwork_paths),
-        "successful": successful,
-        "failed": failed,
-        "reason": reason,
-        "results": results
-    }
+    # Calculate total bytes freed
+    total_bytes_freed = sum(r.get('bytes_freed', 0) for r in results if r.get('success'))
+    total_mb_freed = round(total_bytes_freed / (1024 * 1024), 2)
 
     print(f"\n[API /api/delete] Complete: {successful} successful, {failed} failed")
+    print(f"[API /api/delete] Total space freed: {total_mb_freed} MB")
 
     return jsonify({
         "success": failed == 0,
         "total": len(artwork_paths),
         "successful": successful,
         "failed": failed,
+        "bytes_freed": total_bytes_freed,
+        "mb_freed": total_mb_freed,
         "results": results,
-        "message": f"Unlocked {successful}/{len(artwork_paths)} artwork items. Plex will revert to agent defaults."
+        "message": f"Deleted {successful}/{len(artwork_paths)} artwork items. Freed {total_mb_freed} MB."
     })
 
 
@@ -547,9 +542,69 @@ def clean_old_backups():
     """Clean backups older than specified days."""
     data = request.json
     days = data.get('days', 30)
-    
+
     result = file_manager.clean_old_backups(days)
     return jsonify(result)
+
+
+@app.route('/api/empty-trash', methods=['POST'])
+def empty_trash():
+    """Permanently delete ALL backups (empty trash)."""
+    print("[API /api/empty-trash] Emptying all backups...")
+
+    try:
+        # Delete all backup folders
+        import shutil
+        backup_dir = Path(config.get('backup_directory', Path(__file__).parent.parent / "backups"))
+
+        if not backup_dir.exists():
+            return jsonify({
+                "success": True,
+                "message": "Backup directory does not exist",
+                "removed_count": 0
+            })
+
+        removed_count = 0
+        removed_size = 0
+
+        # Delete all timestamped folders
+        for folder in backup_dir.iterdir():
+            if folder.is_dir():
+                try:
+                    # Calculate size before deleting
+                    folder_size = sum(f.stat().st_size for f in folder.rglob('*') if f.is_file())
+                    shutil.rmtree(folder)
+                    removed_count += 1
+                    removed_size += folder_size
+                    print(f"[empty-trash] Removed: {folder.name} ({folder_size} bytes)")
+                except Exception as e:
+                    print(f"[empty-trash] Failed to remove {folder.name}: {e}")
+
+        # Also clear the operations log
+        operations_log = backup_dir / "operations.json"
+        if operations_log.exists():
+            operations_log.unlink()
+            print(f"[empty-trash] Cleared operations log")
+
+        removed_mb = round(removed_size / (1024 * 1024), 2)
+        print(f"[empty-trash] Complete: {removed_count} folders removed, {removed_mb} MB freed")
+
+        return jsonify({
+            "success": True,
+            "removed_count": removed_count,
+            "bytes_freed": removed_size,
+            "mb_freed": removed_mb,
+            "message": f"Permanently deleted {removed_count} backup folders ({removed_mb} MB)"
+        })
+
+    except Exception as e:
+        print(f"[empty-trash] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 @app.route('/api/search', methods=['POST'])
