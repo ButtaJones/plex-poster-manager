@@ -354,24 +354,97 @@ class PlexScannerAPI:
             "total_artwork": total_artwork
         }
 
-    def delete_artwork(self, rating_key: str, artwork_type: str) -> bool:
+    def delete_artwork(self, item_rating_key: str, artwork_path: str) -> Dict:
         """
         Delete/unlock artwork for an item.
 
-        Note: Plex API doesn't directly delete artwork files from disk.
-        Instead, it can unlock artwork to allow Plex to re-fetch from agents.
+        Important: PlexAPI cannot delete individual posters from the available list.
+        It can only UNLOCK artwork, which resets it to agent defaults.
 
         Args:
-            rating_key: Plex rating key for the artwork
-            artwork_type: Type of artwork (poster, art, banner, theme)
+            item_rating_key: Plex rating key for the item (show/movie)
+            artwork_path: Full path like "303344/poster/12345"
 
         Returns:
-            True if successful
+            Dict with success status and message
         """
-        # TODO: Implement artwork deletion/unlocking via Plex API
-        # This requires using the Plex API endpoint to unlock poster
-        print(f"[delete_artwork] Unlocking {artwork_type} with rating_key: {rating_key}")
-        return False
+        print(f"\n[delete_artwork] Processing deletion request")
+        print(f"[delete_artwork] Item rating key: {item_rating_key}")
+        print(f"[delete_artwork] Artwork path: {artwork_path}")
+
+        try:
+            # Parse path to get artwork type
+            # Format: "item_rating_key/artwork_type/artwork_rating_key"
+            parts = artwork_path.split('/')
+            if len(parts) != 3:
+                return {
+                    "success": False,
+                    "error": f"Invalid artwork path format: {artwork_path}"
+                }
+
+            _, artwork_type, artwork_rating_key = parts
+            print(f"[delete_artwork] Type: {artwork_type}, Rating key: {artwork_rating_key}")
+
+            # Fetch the item from Plex
+            item = self.plex.fetchItem(item_rating_key)
+            print(f"[delete_artwork] Found item: {item.title}")
+
+            # PlexAPI Limitation: Cannot delete individual posters
+            # Can only unlock to reset to agent defaults
+            if artwork_type == 'poster':
+                print(f"[delete_artwork] Unlocking poster for: {item.title}")
+                item.unlockPoster()
+                action = "unlocked poster"
+            elif artwork_type == 'art' or artwork_type == 'background':
+                print(f"[delete_artwork] Unlocking background art for: {item.title}")
+                item.unlockArt()
+                action = "unlocked background"
+            elif artwork_type == 'banner':
+                print(f"[delete_artwork] Unlocking banner for: {item.title}")
+                # Banners might not have unlock, try generic field unlock
+                try:
+                    item.unlockPoster()  # Some libraries treat banners as posters
+                    action = "unlocked banner"
+                except Exception as e:
+                    print(f"[delete_artwork] Banner unlock not supported: {e}")
+                    return {
+                        "success": False,
+                        "error": "Banner unlock not supported by PlexAPI"
+                    }
+            elif artwork_type == 'theme':
+                print(f"[delete_artwork] WARNING: Themes cannot be deleted via PlexAPI")
+                return {
+                    "success": False,
+                    "error": "Themes cannot be deleted using PlexAPI (PlexAPI limitation)"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unknown artwork type: {artwork_type}"
+                }
+
+            # Trigger metadata refresh to update Plex
+            print(f"[delete_artwork] Triggering metadata refresh...")
+            item.refresh()
+
+            print(f"[delete_artwork] ✓ Successfully {action} and refreshed: {item.title}")
+            return {
+                "success": True,
+                "action": action,
+                "item_title": item.title,
+                "message": f"Successfully {action} for {item.title}. Plex will revert to agent defaults."
+            }
+
+        except NotFound:
+            error = f"Item not found with rating key: {item_rating_key}"
+            print(f"[delete_artwork] ERROR: {error}")
+            return {"success": False, "error": error}
+        except Exception as e:
+            error = f"Failed to delete artwork: {str(e)}"
+            print(f"[delete_artwork] ERROR: {error}")
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "error": error}
 
     def refresh_metadata(self, rating_key: str) -> bool:
         """

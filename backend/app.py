@@ -429,20 +429,89 @@ def get_thumbnail():
 
 @app.route('/api/delete', methods=['POST'])
 def delete_artwork():
-    """Delete one or more artwork files."""
+    """
+    Delete/unlock artwork via Plex API.
+
+    Important: PlexAPI can only UNLOCK artwork (resets to agent defaults),
+    not delete individual posters from the available list.
+    """
+    global scanner
+
     data = request.json
-    file_paths = data.get('files', [])
+    artwork_paths = data.get('files', [])
     reason = data.get('reason', 'User deletion')
-    
-    if not file_paths:
-        return jsonify({"error": "No files specified"}), 400
-    
-    if len(file_paths) == 1:
-        result = file_manager.delete_file(file_paths[0], reason)
-    else:
-        result = file_manager.delete_multiple(file_paths, reason)
-    
-    return jsonify(result)
+
+    print(f"\n[API /api/delete] Received delete request")
+    print(f"[API /api/delete] Paths to delete: {len(artwork_paths)}")
+    print(f"[API /api/delete] Reason: {reason}")
+
+    if not artwork_paths:
+        return jsonify({"error": "No artwork specified"}), 400
+
+    if not scanner:
+        return jsonify({
+            "error": "Plex scanner not initialized. Please configure Plex URL and token first."
+        }), 400
+
+    results = []
+    successful = 0
+    failed = 0
+
+    for path in artwork_paths:
+        print(f"\n[API /api/delete] Processing: {path}")
+
+        # Parse path to extract item rating key
+        # Format: "item_rating_key/artwork_type/artwork_rating_key"
+        parts = path.split('/')
+        if len(parts) != 3:
+            print(f"[API /api/delete] ERROR: Invalid path format: {path}")
+            results.append({
+                "path": path,
+                "success": False,
+                "error": "Invalid path format"
+            })
+            failed += 1
+            continue
+
+        item_rating_key = parts[0]
+
+        # Call PlexAPI to unlock/delete artwork
+        result = scanner.delete_artwork(item_rating_key, path)
+
+        if result.get('success'):
+            successful += 1
+            print(f"[API /api/delete] ✓ Success: {result.get('message')}")
+        else:
+            failed += 1
+            print(f"[API /api/delete] ✗ Failed: {result.get('error')}")
+
+        results.append({
+            "path": path,
+            **result
+        })
+
+    # Store operation for history (metadata only, no file backup needed)
+    from datetime import datetime
+    operation = {
+        "timestamp": datetime.now().isoformat(),
+        "action": "unlock_artwork",
+        "total": len(artwork_paths),
+        "successful": successful,
+        "failed": failed,
+        "reason": reason,
+        "results": results
+    }
+
+    print(f"\n[API /api/delete] Complete: {successful} successful, {failed} failed")
+
+    return jsonify({
+        "success": failed == 0,
+        "total": len(artwork_paths),
+        "successful": successful,
+        "failed": failed,
+        "results": results,
+        "message": f"Unlocked {successful}/{len(artwork_paths)} artwork items. Plex will revert to agent defaults."
+    })
 
 
 @app.route('/api/undo', methods=['POST'])
