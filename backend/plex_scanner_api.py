@@ -161,16 +161,15 @@ class PlexScannerAPI:
                 try:
                     item_data = self._get_item_artwork(content, detailed=idx < 5)
 
-                    # FILTER: Only show items with custom artwork in Uploads folder
-                    # This prevents showing items that only have agent posters (can't be deleted)
-                    if item_data.get('has_custom_artwork', False):
-                        if idx < 5:
+                    # Show ALL items, but flag which have custom artwork
+                    # Frontend will indicate deletability with a badge
+                    if idx < 5:
+                        if item_data.get('has_custom_artwork', False):
                             print(f"  ✓ Has {item_data['custom_artwork_count']} deletable file(s) in Uploads folder")
-                        return item_data
-                    else:
-                        if idx < 5:
-                            print(f"  ✗ No custom artwork (only agent posters) - skipping")
-                        return None
+                        else:
+                            print(f"  ℹ No custom artwork (agent posters only)")
+
+                    return item_data
                 except Exception as e:
                     if idx < 5:
                         print(f"[scan_library] ERROR processing {content.title}: {e}")
@@ -193,8 +192,10 @@ class PlexScannerAPI:
                     except Exception as e:
                         print(f"[scan_library] ERROR in thread: {e}")
 
+            items_with_custom = sum(1 for item in items if item.get('has_custom_artwork', False))
             print(f"\n[scan_library] Scan complete!")
-            print(f"[scan_library] Total items with CUSTOM artwork: {len(items)}")
+            print(f"[scan_library] Total items scanned: {len(items)}")
+            print(f"[scan_library] Items with custom artwork: {items_with_custom}")
             print(f"[scan_library] Total deletable files: {sum(item.get('custom_artwork_count', 0) for item in items)}")
 
             return {
