@@ -22,6 +22,8 @@ from typing import List, Dict, Optional
 import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+import os
+import platform
 
 
 class PlexScannerAPI:
@@ -411,13 +413,48 @@ class PlexScannerAPI:
                     "error": f"Item type '{item.type}' does not have metadataDirectory property"
                 }
 
-            metadata_dir = Path(item.metadataDirectory)
-            print(f"[delete_artwork] Metadata directory: {metadata_dir}")
+            metadata_dir_raw = item.metadataDirectory
+            print(f"[delete_artwork] Raw metadata directory: {metadata_dir_raw}")
+
+            # PlexAPI sometimes returns relative paths like "Metadata\\TV Shows\\..."
+            # We need to convert to absolute path using Plex data directory
+            metadata_dir = Path(metadata_dir_raw)
+
+            if not metadata_dir.is_absolute():
+                # Get Plex data directory from server
+                print(f"[delete_artwork] Path is relative, finding Plex data directory...")
+
+                # Try to get from Plex server transcoder path
+                try:
+                    # The transcoder path typically points to the Plex data directory
+                    # Example: "C:\Users\...\AppData\Local\Plex Media Server\Plex Transcoder.exe"
+                    transcoder_path = self.plex.transcodeDirectory
+                    plex_data_dir = Path(transcoder_path).parent
+                    metadata_dir = plex_data_dir / metadata_dir_raw
+                    print(f"[delete_artwork] Resolved to absolute path: {metadata_dir}")
+                except Exception as e:
+                    print(f"[delete_artwork] Could not resolve via transcoder path: {e}")
+
+                    # Fallback: Try common Plex data directory locations
+                    system = platform.system()
+
+                    if system == 'Windows':
+                        plex_data_dir = Path(os.environ.get('LOCALAPPDATA')) / "Plex Media Server"
+                    elif system == 'Darwin':  # macOS
+                        plex_data_dir = Path.home() / "Library" / "Application Support" / "Plex Media Server"
+                    else:  # Linux
+                        plex_data_dir = Path("/var/lib/plexmediaserver/Library/Application Support/Plex Media Server")
+
+                    metadata_dir = plex_data_dir / metadata_dir_raw
+                    print(f"[delete_artwork] Using platform default: {metadata_dir}")
+
+            print(f"[delete_artwork] Final metadata directory: {metadata_dir}")
 
             if not metadata_dir.exists():
                 return {
                     "success": False,
-                    "error": f"Metadata directory does not exist: {metadata_dir}"
+                    "error": f"Metadata directory does not exist: {metadata_dir}",
+                    "info": f"Tried to resolve relative path '{metadata_dir_raw}' but directory not found"
                 }
 
             # Look for Uploads subfolder
