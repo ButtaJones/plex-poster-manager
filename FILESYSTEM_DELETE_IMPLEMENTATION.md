@@ -39,9 +39,17 @@ This update completely reimplements artwork deletion to **actually delete files 
 
 ### What Gets Deleted:
 - **Location**: `%LOCALAPPDATA%\Plex Media Server\Metadata\TV Shows\<hash>\Uploads\` (Windows)
-- **Files**: All .jpg, .jpeg, .png files in the Uploads folder
+- **Subfolders**: `Uploads/posters/`, `Uploads/art/`, `Uploads/backgrounds/`, `Uploads/banners/`, `Uploads/themes/`
+- **Files**: All .jpg, .jpeg, .png files in Uploads subfolders
 - **Target**: Custom Kometa artwork, uploaded posters
 - **Safe**: Files are backed up before deletion, can be restored
+
+**IMPORTANT DISCOVERY:** Uploads folder has subfolders! Files are stored as:
+- `Uploads/posters/*.jpg` - Custom poster images
+- `Uploads/art/*.jpg` - Custom background images
+- `Uploads/backgrounds/*.jpg` - Alternative background location
+- `Uploads/banners/*.jpg` - Banner images (TV shows)
+- `Uploads/themes/*.mp3` - Theme music files
 
 ### What Doesn't Get Deleted:
 - Agent-provided artwork (TMDB, TVDB, etc.) - stored elsewhere
@@ -255,10 +263,11 @@ useEffect(() => {
 
 ## Known Limitations
 
-1. **Uploads Folder Only**:
-   - Only deletes files from `Metadata\<library>\<hash>\Uploads\`
-   - Agent-provided artwork stored elsewhere (not deleted)
+1. **Uploads Subfolders Only**:
+   - Only deletes files from `Metadata\<library>\<hash>\Uploads\posters\`, `Uploads\art\`, etc.
+   - Agent-provided artwork stored in `Contents\_combined\` (not deleted)
    - This is intentional - protects Plex's core metadata
+   - Some Plex setups might use different subfolder names (will be added as discovered)
 
 2. **PlexAPI `metadataDirectory` Requirement**:
    - Requires PlexAPI's `metadataDirectory` property

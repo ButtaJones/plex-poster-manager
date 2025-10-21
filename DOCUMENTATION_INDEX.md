@@ -3,7 +3,7 @@
 Complete guide to all documentation in this repository.
 
 **Last Updated:** 2025-10-20
-**Current Version:** 2.1.1 (dev branch: 2.1.2-dev)
+**Current Version:** 2.1.1 (dev branch: 2.2.0-dev - Filesystem Delete)
 
 ---
 
@@ -96,6 +96,25 @@ Complete guide to all documentation in this repository.
 - Frontend update suggestions
 
 **Created:** 2025-10-20 (v2.1.1)
+**Updated:** 2025-10-20 (v2.2.0-dev - Added subfolder structure details)
+
+---
+
+### **[CHANGELOG.md](CHANGELOG.md)** - Version History
+**Purpose:** Track all changes, bug fixes, and features by version
+**Read this for:**
+- What changed in each version
+- Bug fixes and their solutions
+- Breaking changes and migration notes
+- New features and improvements
+
+**Key Sections:**
+- v2.2.0-dev: Filesystem delete, subfolder support, critical fixes
+- v2.1.1: PlexAPI delete (deprecated)
+- v2.0.0: Major rewrite to Plex API
+- v1.x: Legacy filesystem scanning
+
+**Created:** 2025-10-20 (v2.2.0-dev)
 
 ---
 
