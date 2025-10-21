@@ -160,8 +160,17 @@ class PlexScannerAPI:
 
                 try:
                     item_data = self._get_item_artwork(content, detailed=idx < 5)
-                    if item_data['total_artwork'] > 0:
+
+                    # FILTER: Only show items with custom artwork in Uploads folder
+                    # This prevents showing items that only have agent posters (can't be deleted)
+                    if item_data.get('has_custom_artwork', False):
+                        if idx < 5:
+                            print(f"  ✓ Has {item_data['custom_artwork_count']} deletable file(s) in Uploads folder")
                         return item_data
+                    else:
+                        if idx < 5:
+                            print(f"  ✗ No custom artwork (only agent posters) - skipping")
+                        return None
                 except Exception as e:
                     if idx < 5:
                         print(f"[scan_library] ERROR processing {content.title}: {e}")
@@ -185,8 +194,8 @@ class PlexScannerAPI:
                         print(f"[scan_library] ERROR in thread: {e}")
 
             print(f"\n[scan_library] Scan complete!")
-            print(f"[scan_library] Total items with artwork: {len(items)}")
-            print(f"[scan_library] Total artwork files: {sum(item['total_artwork'] for item in items)}")
+            print(f"[scan_library] Total items with CUSTOM artwork: {len(items)}")
+            print(f"[scan_library] Total deletable files: {sum(item.get('custom_artwork_count', 0) for item in items)}")
 
             return {
                 'items': items,
@@ -336,6 +345,21 @@ class PlexScannerAPI:
             if detailed:
                 print(f"  [artwork] No themes available: {e}")
 
+        # FILTER: Only show artwork that can actually be deleted (exists in Uploads folder)
+        # This prevents showing agent-provided posters that can't be deleted
+        uploads_file_count = self._get_uploads_file_count(item)
+
+        if uploads_file_count > 0:
+            # Mark that this item has deletable artwork
+            if detailed:
+                print(f"  [artwork] Found {uploads_file_count} deletable files in Uploads folder")
+        else:
+            # No custom artwork to delete - clear all artwork lists
+            if detailed:
+                print(f"  [artwork] No custom artwork in Uploads folder (showing agent posters only)")
+            # Don't clear - we still want to show the posters for viewing
+            # But we could add a flag to indicate they're not deletable
+
         # Calculate total artwork
         total_artwork = (
             len(artwork_data["posters"]) +
@@ -354,8 +378,55 @@ class PlexScannerAPI:
                 "parent_title": getattr(item, 'parentTitle', None) if item.type == 'season' else None
             },
             "artwork": artwork_data,
-            "total_artwork": total_artwork
+            "total_artwork": total_artwork,
+            "has_custom_artwork": uploads_file_count > 0,  # NEW: Flag for frontend
+            "custom_artwork_count": uploads_file_count  # NEW: How many deletable files
         }
+
+    def _get_uploads_file_count(self, item) -> int:
+        """
+        Check how many actual artwork files exist in the Uploads folder.
+        Returns count of deletable files.
+        """
+        try:
+            if not hasattr(item, 'metadataDirectory'):
+                return 0
+
+            metadata_dir_raw = item.metadataDirectory
+            metadata_dir = Path(metadata_dir_raw)
+
+            # Resolve relative paths
+            if not metadata_dir.is_absolute():
+                try:
+                    transcoder_path = self.plex.transcodeDirectory
+                    plex_data_dir = Path(transcoder_path).parent
+                    metadata_dir = plex_data_dir / metadata_dir_raw
+                except Exception:
+                    system = platform.system()
+                    if system == 'Windows':
+                        plex_data_dir = Path(os.environ.get('LOCALAPPDATA')) / "Plex Media Server"
+                    elif system == 'Darwin':
+                        plex_data_dir = Path.home() / "Library" / "Application Support" / "Plex Media Server"
+                    else:
+                        plex_data_dir = Path("/var/lib/plexmediaserver/Library/Application Support/Plex Media Server")
+                    metadata_dir = plex_data_dir / metadata_dir_raw
+
+            if not metadata_dir.exists():
+                return 0
+
+            uploads_dir = metadata_dir / "Uploads"
+            if not uploads_dir.exists():
+                return 0
+
+            # Count .jpg, .jpeg, .png files
+            file_count = 0
+            for ext in ['*.jpg', '*.jpeg', '*.png']:
+                file_count += len(list(uploads_dir.glob(ext)))
+
+            return file_count
+
+        except Exception as e:
+            return 0
 
     def delete_artwork(self, item_rating_key: str, artwork_path: str) -> Dict:
         """
