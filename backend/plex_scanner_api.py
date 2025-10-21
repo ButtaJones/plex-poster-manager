@@ -260,13 +260,14 @@ class PlexScannerAPI:
                 print(f"  [artwork] Found {len(posters)} posters")
 
             for idx, poster in enumerate(posters):
-                rating_key = poster.ratingKey if hasattr(poster, 'ratingKey') else f"poster_{idx}"
+                # Use index as rating key since poster.ratingKey might be a URL
+                poster_key = f"poster_{idx}"
                 artwork_data["posters"].append({
-                    "path": f"{item.ratingKey}/poster/{rating_key}",  # Unique path for React keys
+                    "path": f"{item.ratingKey}/poster/{poster_key}",  # Unique path for React keys
                     "provider": poster.provider if hasattr(poster, 'provider') else "unknown",
                     "selected": poster.selected if hasattr(poster, 'selected') else False,
                     "thumb_url": self._build_thumb_url(poster.thumb, item.ratingKey),
-                    "rating_key": rating_key,
+                    "rating_key": poster_key,
                     "type": "poster"
                 })
         except Exception as e:
@@ -280,13 +281,13 @@ class PlexScannerAPI:
                 print(f"  [artwork] Found {len(arts)} background arts")
 
             for idx, art in enumerate(arts):
-                rating_key = art.ratingKey if hasattr(art, 'ratingKey') else f"art_{idx}"
+                art_key = f"art_{idx}"
                 artwork_data["art"].append({
-                    "path": f"{item.ratingKey}/art/{rating_key}",  # Unique path for React keys
+                    "path": f"{item.ratingKey}/art/{art_key}",  # Unique path for React keys
                     "provider": art.provider if hasattr(art, 'provider') else "unknown",
                     "selected": art.selected if hasattr(art, 'selected') else False,
                     "thumb_url": self._build_thumb_url(art.thumb, item.ratingKey),
-                    "rating_key": rating_key,
+                    "rating_key": art_key,
                     "type": "background"
                 })
         except Exception as e:
@@ -300,13 +301,13 @@ class PlexScannerAPI:
                 print(f"  [artwork] Found {len(banners)} banners")
 
             for idx, banner in enumerate(banners):
-                rating_key = banner.ratingKey if hasattr(banner, 'ratingKey') else f"banner_{idx}"
+                banner_key = f"banner_{idx}"
                 artwork_data["banners"].append({
-                    "path": f"{item.ratingKey}/banner/{rating_key}",  # Unique path for React keys
+                    "path": f"{item.ratingKey}/banner/{banner_key}",  # Unique path for React keys
                     "provider": banner.provider if hasattr(banner, 'provider') else "unknown",
                     "selected": banner.selected if hasattr(banner, 'selected') else False,
                     "thumb_url": self._build_thumb_url(banner.thumb, item.ratingKey),
-                    "rating_key": rating_key,
+                    "rating_key": banner_key,
                     "type": "banner"
                 })
         except Exception as e:
@@ -320,13 +321,13 @@ class PlexScannerAPI:
                 print(f"  [artwork] Found {len(themes)} themes")
 
             for idx, theme in enumerate(themes):
-                rating_key = theme.ratingKey if hasattr(theme, 'ratingKey') else f"theme_{idx}"
+                theme_key = f"theme_{idx}"
                 artwork_data["themes"].append({
-                    "path": f"{item.ratingKey}/theme/{rating_key}",  # Unique path for React keys
+                    "path": f"{item.ratingKey}/theme/{theme_key}",  # Unique path for React keys
                     "provider": theme.provider if hasattr(theme, 'provider') else "unknown",
                     "selected": theme.selected if hasattr(theme, 'selected') else False,
                     "thumb_url": self._build_thumb_url(theme.thumb, item.ratingKey),
-                    "rating_key": rating_key,
+                    "rating_key": theme_key,
                     "type": "theme"
                 })
         except Exception as e:
