@@ -84,6 +84,8 @@ function App() {
     return 200;
   });
   const [expandedItems, setExpandedItems] = useState(new Set()); // Track which items are expanded (by rating_key)
+  const [isDeleting, setIsDeleting] = useState(false); // Track deletion in progress
+  const [deleteProgress, setDeleteProgress] = useState(null); // Track delete progress message
 
   // Save dark mode preference
   useEffect(() => {
@@ -394,9 +396,16 @@ function App() {
       return;
     }
 
+    // Show loading modal
+    setIsDeleting(true);
+    setDeleteProgress(`Deleting ${paths.length} file(s)...`);
+
     try {
-      await artworkAPI.deleteArtwork(paths, 'User deletion');
-      alert(`Successfully deleted ${paths.length} file(s)`);
+      const response = await artworkAPI.deleteArtwork(paths, 'User deletion');
+
+      // Update progress message with success info
+      const mbFreed = response.data?.mb_freed || 0;
+      setDeleteProgress(`Successfully deleted ${paths.length} file(s) (${mbFreed.toFixed(2)} MB freed)`);
 
       // Remove deleted artwork from current items view (without re-scanning)
       const pathSet = new Set(paths);
@@ -428,24 +437,24 @@ function App() {
       });
 
       setAllItems(updatedAllItems);
+      setItems(updatedItems); // Keep current view (don't navigate away)
       setSelectedArtwork([]);
-
-      // If we're in a filtered view (from search/dropdown), go back to paginated results
-      if (items.length < allItems.length || searchQuery.trim()) {
-        // Clear search and show first page
-        setSearchQuery('');
-        const firstPageItems = scanLimit ? updatedAllItems.slice(0, scanLimit) : updatedAllItems;
-        setItems(firstPageItems);
-        setCurrentPage(1);
-      } else {
-        // Otherwise just update the current view
-        setItems(updatedItems);
-      }
-
       loadOperations();
+
+      // Auto-close modal after 1.5 seconds
+      setTimeout(() => {
+        setIsDeleting(false);
+        setDeleteProgress(null);
+      }, 1500);
     } catch (error) {
       console.error('Error deleting artwork:', error);
-      alert('Error deleting artwork: ' + error.message);
+      setDeleteProgress(`Error: ${error.message}`);
+
+      // Auto-close error modal after 3 seconds
+      setTimeout(() => {
+        setIsDeleting(false);
+        setDeleteProgress(null);
+      }, 3000);
     }
   };
 
@@ -1117,6 +1126,50 @@ function App() {
         onSave={handleSaveConfig}
         darkMode={darkMode}
       />
+
+      {/* Delete Progress Modal */}
+      {isDeleting && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 border`}>
+            <div className="flex flex-col items-center">
+              {deleteProgress?.startsWith('Error') ? (
+                <>
+                  {/* Error Icon */}
+                  <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                    <X className="w-8 h-8 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className={`text-lg font-semibold mb-2 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                    {deleteProgress}
+                  </div>
+                </>
+              ) : deleteProgress?.startsWith('Successfully') ? (
+                <>
+                  {/* Success Checkmark */}
+                  <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className={`text-lg font-semibold mb-2 text-center ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                    {deleteProgress}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Loading Spinner */}
+                  <Loader className={`w-16 h-16 mb-4 animate-spin ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+                  <div className={`text-lg font-semibold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                    {deleteProgress}
+                  </div>
+                  <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Please wait...
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

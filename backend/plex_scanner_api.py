@@ -464,8 +464,8 @@ class PlexScannerAPI:
                         if debug:
                             all_files.extend([f"{subfolder}/{f.name}" for f in files])
 
-                    # Also check season subfolders (e.g., posters/seasons/1/)
-                    if subfolder == 'posters':
+                    # Also check season subfolders (e.g., posters/seasons/1/, art/seasons/2/)
+                    if subfolder in ['posters', 'art']:
                         seasons_dir = subfolder_path / 'seasons'
                         if seasons_dir.exists():
                             for season_folder in seasons_dir.iterdir():
@@ -629,8 +629,8 @@ class PlexScannerAPI:
                     files = [f for f in subfolder_path.iterdir() if f.is_file()]
                     artwork_files.extend(files)
 
-                    # Also check season subfolders (e.g., posters/seasons/1/)
-                    if subfolder == 'posters':
+                    # Also check season subfolders (e.g., posters/seasons/1/, art/seasons/2/)
+                    if subfolder in ['posters', 'art']:
                         seasons_dir = subfolder_path / 'seasons'
                         if seasons_dir.exists():
                             for season_folder in seasons_dir.iterdir():
