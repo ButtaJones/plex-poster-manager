@@ -550,12 +550,12 @@ class PlexPosterManagerLauncher:
         self.log("\n[Backend] Starting Flask server...")
         try:
             self.backend_process = subprocess.Popen(
-                [str(VENV_PYTHON), "app.py"],
+                [str(VENV_PYTHON), "-u", "app.py"],  # -u = unbuffered output
                 cwd=str(BACKEND_DIR),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1
+                bufsize=0  # Unbuffered
             )
             self.backend_status.config(text="Backend: Running", foreground="green")
             self.log("✓ Backend started")
@@ -582,7 +582,7 @@ class PlexPosterManagerLauncher:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1,
+                bufsize=0,  # Unbuffered
                 env=env
             )
             self.frontend_status.config(text="Frontend: Running", foreground="green")
