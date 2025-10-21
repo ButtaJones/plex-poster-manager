@@ -456,20 +456,32 @@ class PlexScannerAPI:
             for subfolder in subfolders:
                 subfolder_path = uploads_dir / subfolder
                 if subfolder_path.exists():
-                    for ext in ['*.jpg', '*.jpeg', '*.png']:
-                        files = list(subfolder_path.glob(ext))
-                        if files:
-                            file_count += len(files)
-                            if debug:
-                                all_files.extend([f"{subfolder}/{f.name}" for f in files])
+                    # FIX: Plex stores files WITHOUT extensions, so look for all files
+                    # Changed from looking for *.jpg, *.jpeg, *.png to all files
+                    files = [f for f in subfolder_path.iterdir() if f.is_file()]
+                    if files:
+                        file_count += len(files)
+                        if debug:
+                            all_files.extend([f"{subfolder}/{f.name}" for f in files])
+
+                    # Also check season subfolders (e.g., posters/seasons/1/)
+                    if subfolder == 'posters':
+                        seasons_dir = subfolder_path / 'seasons'
+                        if seasons_dir.exists():
+                            for season_folder in seasons_dir.iterdir():
+                                if season_folder.is_dir():
+                                    season_files = [f for f in season_folder.iterdir() if f.is_file()]
+                                    if season_files:
+                                        file_count += len(season_files)
+                                        if debug:
+                                            all_files.extend([f"{subfolder}/seasons/{season_folder.name}/{f.name}" for f in season_files])
 
             # Also check root Uploads folder (some setups might put files there directly)
-            for ext in ['*.jpg', '*.jpeg', '*.png']:
-                files = list(uploads_dir.glob(ext))
-                if files:
-                    file_count += len(files)
-                    if debug:
-                        all_files.extend([f.name for f in files])
+            root_files = [f for f in uploads_dir.iterdir() if f.is_file()]
+            if root_files:
+                file_count += len(root_files)
+                if debug:
+                    all_files.extend([f.name for f in root_files])
 
             if debug:
                 if file_count > 0:
@@ -612,12 +624,23 @@ class PlexScannerAPI:
             for subfolder in subfolders:
                 subfolder_path = uploads_dir / subfolder
                 if subfolder_path.exists():
-                    for ext in ['*.jpg', '*.jpeg', '*.png']:
-                        artwork_files.extend(subfolder_path.glob(ext))
+                    # FIX: Plex stores files WITHOUT extensions, so look for all files
+                    # Changed from looking for *.jpg, *.jpeg, *.png to all files
+                    files = [f for f in subfolder_path.iterdir() if f.is_file()]
+                    artwork_files.extend(files)
+
+                    # Also check season subfolders (e.g., posters/seasons/1/)
+                    if subfolder == 'posters':
+                        seasons_dir = subfolder_path / 'seasons'
+                        if seasons_dir.exists():
+                            for season_folder in seasons_dir.iterdir():
+                                if season_folder.is_dir():
+                                    season_files = [f for f in season_folder.iterdir() if f.is_file()]
+                                    artwork_files.extend(season_files)
 
             # Also check root Uploads folder (some setups might put files there directly)
-            for ext in ['*.jpg', '*.jpeg', '*.png']:
-                artwork_files.extend(uploads_dir.glob(ext))
+            root_files = [f for f in uploads_dir.iterdir() if f.is_file()]
+            artwork_files.extend(root_files)
 
             if not artwork_files:
                 print(f"[delete_artwork] No artwork files found in Uploads folder or subfolders")
