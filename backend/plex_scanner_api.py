@@ -445,14 +445,31 @@ class PlexScannerAPI:
             if debug:
                 print(f"    [uploads_check] ✓ Uploads folder exists: {uploads_dir}")
 
-            # Count .jpg, .jpeg, .png files
+            # Count .jpg, .jpeg, .png files in Uploads subfolders
+            # Structure: Uploads/posters/*.jpg, Uploads/art/*.jpg, Uploads/themes/*.mp3
             file_count = 0
             all_files = []
+
+            # Check multiple subfolder patterns (posters, art, backgrounds, etc.)
+            subfolders = ['posters', 'art', 'backgrounds', 'banners', 'themes']
+
+            for subfolder in subfolders:
+                subfolder_path = uploads_dir / subfolder
+                if subfolder_path.exists():
+                    for ext in ['*.jpg', '*.jpeg', '*.png']:
+                        files = list(subfolder_path.glob(ext))
+                        if files:
+                            file_count += len(files)
+                            if debug:
+                                all_files.extend([f"{subfolder}/{f.name}" for f in files])
+
+            # Also check root Uploads folder (some setups might put files there directly)
             for ext in ['*.jpg', '*.jpeg', '*.png']:
                 files = list(uploads_dir.glob(ext))
-                file_count += len(files)
-                if debug and files:
-                    all_files.extend([f.name for f in files])
+                if files:
+                    file_count += len(files)
+                    if debug:
+                        all_files.extend([f.name for f in files])
 
             if debug:
                 if file_count > 0:
@@ -586,17 +603,28 @@ class PlexScannerAPI:
                     "info": "This item has no custom uploaded artwork to delete"
                 }
 
-            # Find artwork files in Uploads folder
+            # Find artwork files in Uploads folder and subfolders
+            # Structure: Uploads/posters/*.jpg, Uploads/art/*.jpg, etc.
             artwork_files = []
+
+            # Check subfolders first (posters, art, backgrounds, banners, themes)
+            subfolders = ['posters', 'art', 'backgrounds', 'banners', 'themes']
+            for subfolder in subfolders:
+                subfolder_path = uploads_dir / subfolder
+                if subfolder_path.exists():
+                    for ext in ['*.jpg', '*.jpeg', '*.png']:
+                        artwork_files.extend(subfolder_path.glob(ext))
+
+            # Also check root Uploads folder (some setups might put files there directly)
             for ext in ['*.jpg', '*.jpeg', '*.png']:
                 artwork_files.extend(uploads_dir.glob(ext))
 
             if not artwork_files:
-                print(f"[delete_artwork] No artwork files found in Uploads folder")
+                print(f"[delete_artwork] No artwork files found in Uploads folder or subfolders")
                 return {
                     "success": False,
                     "error": "No artwork files found in Uploads folder",
-                    "info": "Uploads folder exists but contains no image files"
+                    "info": "Uploads folder exists but contains no image files in posters/art/backgrounds subfolders"
                 }
 
             print(f"[delete_artwork] Found {len(artwork_files)} artwork files to delete")
