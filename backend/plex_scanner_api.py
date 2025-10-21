@@ -387,8 +387,26 @@ class PlexScannerAPI:
             print(f"[delete_artwork] Type: {artwork_type}, Rating key: {artwork_rating_key}")
 
             # Fetch the item from Plex
-            item = self.plex.fetchItem(item_rating_key)
-            print(f"[delete_artwork] Found item: {item.title}")
+            print(f"[delete_artwork] Fetching item with rating key: {item_rating_key}")
+            print(f"[delete_artwork] Plex URL: {self.plex_url}")
+
+            # Use the library to fetch the item instead of direct fetchItem
+            # This avoids URL construction issues
+            try:
+                item = self.plex.fetchItem(int(item_rating_key))
+                print(f"[delete_artwork] Found item: {item.title}")
+            except Exception as e:
+                print(f"[delete_artwork] fetchItem failed: {e}, trying alternative method...")
+                # Alternative: search through all libraries
+                for section in self.plex.library.sections():
+                    try:
+                        item = section.fetchItem(int(item_rating_key))
+                        print(f"[delete_artwork] Found item via library search: {item.title}")
+                        break
+                    except:
+                        continue
+                else:
+                    raise Exception(f"Could not find item with rating key: {item_rating_key}")
 
             # PlexAPI Limitation: Cannot delete individual posters
             # Can only unlock to reset to agent defaults
