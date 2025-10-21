@@ -854,7 +854,7 @@ function App() {
                 <div className="text-4xl font-bold drop-shadow-lg">{items.length}</div>
                 <div className="text-sm font-medium opacity-95 mt-2">Items Shown</div>
               </div>
-              <div className={`${darkMode ? 'bg-gradient-to-br from-orange-500 via-amber-600 to-yellow-700' : 'bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-600'} text-white p-5 rounded-xl shadow-xl cursor-pointer transform hover:scale-105 transition-all duration-200`}>
+              <div className={`${darkMode ? 'bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-700' : 'bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-600'} text-white p-5 rounded-xl shadow-xl cursor-pointer transform hover:scale-105 transition-all duration-200`}>
                 <button
                   onClick={() => {
                     loadOperations();
@@ -1045,26 +1045,36 @@ function App() {
                           style={{ cursor: 'pointer' }}
                         >
                           {/* Show first poster/artwork as thumbnail */}
-                          {(() => {
-                            // Get first available poster (try posters, then art, then backgrounds, then banners)
-                            const firstPoster = item.artwork?.posters?.[0] ||
-                                              item.artwork?.art?.[0] ||
-                                              item.artwork?.backgrounds?.[0] ||
-                                              item.artwork?.banners?.[0];
+                          <div className="relative">
+                            {(() => {
+                              // Get first available poster (try posters, then art, then backgrounds, then banners)
+                              const firstPoster = item.artwork?.posters?.[0] ||
+                                                item.artwork?.art?.[0] ||
+                                                item.artwork?.backgrounds?.[0] ||
+                                                item.artwork?.banners?.[0];
 
-                            return firstPoster ? (
-                              <img
-                                src={firstPoster.thumb_url}
-                                alt={item.info.title}
-                                className="w-full aspect-[2/3] object-cover"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className={`w-full aspect-[2/3] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                                <Image className={`w-12 h-12 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                              return firstPoster ? (
+                                <img
+                                  src={firstPoster.thumb_url}
+                                  alt={item.info.title}
+                                  className="w-full aspect-[2/3] object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className={`w-full aspect-[2/3] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                                  <Image className={`w-12 h-12 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                                </div>
+                              );
+                            })()}
+                            {/* Deletable Badge Overlay */}
+                            {item.has_custom_artwork && (
+                              <div className="absolute top-2 right-2">
+                                <span className="px-2 py-1 text-xs font-bold rounded-full bg-green-500 text-white shadow-lg">
+                                  {item.custom_artwork_count}
+                                </span>
                               </div>
-                            );
-                          })()}
+                            )}
+                          </div>
                           <div className="p-3">
                             <h3 className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                               {item.info.title}

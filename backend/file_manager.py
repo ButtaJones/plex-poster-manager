@@ -49,9 +49,9 @@ class FileManager:
                 "error": "File does not exist"
             }
         
-        # Create timestamped backup folder
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_folder = self.backup_dir / timestamp
+        # Create timestamped backup folder (Plex Poster Manager/YYYYMMDD/)
+        timestamp = datetime.now().strftime("%Y%m%d")
+        backup_folder = self.backup_dir / "Plex Poster Manager" / timestamp
         backup_folder.mkdir(parents=True, exist_ok=True)
         
         # Preserve directory structure in backup
@@ -90,7 +90,7 @@ class FileManager:
     
     def delete_multiple(self, file_paths: List[str], reason: str = "") -> Dict:
         """Delete multiple files in a batch operation."""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d")
         batch_id = len(self.operations)
         results = []
         
@@ -164,10 +164,26 @@ class FileManager:
         """Remove backups older than specified days."""
         cutoff = datetime.now().timestamp() - (days * 86400)
         removed = []
-        
+
+        # Check in "Plex Poster Manager" subfolder (new format)
+        ppm_folder = self.backup_dir / "Plex Poster Manager"
+        if ppm_folder.exists():
+            for folder in ppm_folder.iterdir():
+                if folder.is_dir() and folder.name.isdigit():
+                    try:
+                        # New format: YYYYMMDD
+                        timestamp = datetime.strptime(folder.name, "%Y%m%d").timestamp()
+                        if timestamp < cutoff:
+                            shutil.rmtree(folder)
+                            removed.append(f"Plex Poster Manager/{folder.name}")
+                    except ValueError:
+                        continue
+
+        # Also check for old format folders (backward compatibility)
         for folder in self.backup_dir.iterdir():
             if folder.is_dir() and folder.name.replace("_", "").isdigit():
                 try:
+                    # Old format: YYYYMMDD_HHMMSS
                     timestamp = datetime.strptime(folder.name, "%Y%m%d_%H%M%S").timestamp()
                     if timestamp < cutoff:
                         shutil.rmtree(folder)
