@@ -50,6 +50,13 @@ const ArtworkCard = React.memo(({ artwork, item, onSelect, isSelected, onDelete,
     return names[provider] || provider;
   };
 
+  // Determine if artwork is deletable (custom uploaded) vs agent-provided
+  const isDeletable = (provider) => {
+    // Custom/uploaded artwork can be deleted
+    const deletableProviders = ['plex', 'local', 'unknown'];
+    return deletableProviders.includes(provider);
+  };
+
   return (
     <div
       style={cardStyle}
@@ -122,7 +129,7 @@ const ArtworkCard = React.memo(({ artwork, item, onSelect, isSelected, onDelete,
         }`}>
           {artwork.type}
         </p>
-        <div className={`flex justify-between text-xs ${
+        <div className={`flex justify-between items-center text-xs ${
           darkMode ? 'text-gray-500' : 'text-gray-500'
         }`}>
           <span>{getProviderName(artwork.provider)}</span>
@@ -130,6 +137,20 @@ const ArtworkCard = React.memo(({ artwork, item, onSelect, isSelected, onDelete,
             darkMode ? 'text-green-400' : 'text-green-600'
           }`}>Active</span>}
         </div>
+
+        {/* Deletable Badge */}
+        <div className="mt-2">
+          {isDeletable(artwork.provider) ? (
+            <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+              Deletable
+            </span>
+          ) : (
+            <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+              Agent Only
+            </span>
+          )}
+        </div>
+
         {imageDimensions && (
           <div className={`text-xs mt-1 ${
             darkMode ? 'text-gray-500' : 'text-gray-500'

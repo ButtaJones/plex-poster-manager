@@ -127,8 +127,19 @@ function App() {
 
           // Set initial page items - handle "All Items" case (null scanLimit)
           const limit = savedData.scanLimit;
-          const pageItems = limit ? savedData.allItems.slice(0, limit) : savedData.allItems;
-          setItems(pageItems);
+          const savedPage = savedData.currentPage || 1;
+
+          if (limit) {
+            // Calculate correct slice for the saved page
+            const startIdx = (savedPage - 1) * limit;
+            const endIdx = startIdx + limit;
+            const pageItems = savedData.allItems.slice(startIdx, endIdx);
+            setItems(pageItems);
+            console.log(`[App] Restored page ${savedPage} items (${startIdx} to ${endIdx})`);
+          } else {
+            // "All Items" mode - show everything
+            setItems(savedData.allItems);
+          }
 
           console.log(`[App] Restored ${savedData.allItems.length} items from IndexedDB`);
         }
